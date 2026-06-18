@@ -115,7 +115,7 @@ class CaptureService : Service() {
         createNotificationChannel()
         startForegroundCompat()
         acquireWakeLock()
-        toast("Szolgaltatas elindult")
+        toast("Szolgáltatás elindult")
         initCamera()
         connectWebSocket()
     }
@@ -125,7 +125,7 @@ class CaptureService : Service() {
             ACTION_RECONNECT_WS -> {
                 // a beallitasok valtoztak: zarjuk a jelenlegi kapcsolatot, az
                 // onClosed -> reconnectLater() mar az uj URL-lel csatlakozik vissza
-                toast("Beallitasok mentve, WebSocket ujracsatlakozas")
+                toast("Beállítások mentve, WebSocket újracsatlakozás")
                 try { webSocket?.close(1000, "settings changed") } catch (_: Exception) {}
                 wsConnected = false
                 deviceMode = -1
@@ -144,7 +144,7 @@ class CaptureService : Service() {
 
     private fun queryMode() {
         if (!wsConnected || webSocket == null) {
-            toast("Mod lekerdezes nem megy: nincs WebSocket kapcsolat")
+            toast("Mód lekérdezés nem megy: nincs WebSocket kapcsolat")
             return
         }
         modePending = true
@@ -153,12 +153,12 @@ class CaptureService : Service() {
 
     private fun setMode(target: Int) {
         if (!wsConnected || webSocket == null) {
-            toast("Mod valtas nem megy: nincs WebSocket kapcsolat")
+            toast("Mód váltás nem megy: nincs WebSocket kapcsolat")
             return
         }
         modePending = true
         webSocket?.send("setmode$target")
-        toast("Mod valtas kuldve: setmode$target")
+        toast("Mód váltás küldve: setmode$target")
     }
 
     /** true, ha az uzenet mod-valasz volt ("mode0" / "mode1") es feldolgoztuk */
@@ -167,13 +167,13 @@ class CaptureService : Service() {
             "mode0" -> {
                 deviceMode = 0
                 modePending = false
-                toast("Mod: Remote Controller")
+                toast("Mód: Remote Controller")
                 true
             }
             "mode1" -> {
                 deviceMode = 1
                 modePending = false
-                toast("Mod: Audio Controller")
+                toast("Mód: Audio Controller")
                 true
             }
             else -> false
@@ -197,13 +197,13 @@ class CaptureService : Service() {
         val pp = AppSettings.cmdPlayPause(this).trim().lowercase(Locale.US)
 
         if (next.isNotEmpty() && t == next) {
-            sendMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT); toast("Media: kovetkezo szam"); return true
+            sendMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT); toast("Média: következő szám"); return true
         }
         if (prev.isNotEmpty() && t == prev) {
-            sendMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS); toast("Media: elozo szam"); return true
+            sendMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS); toast("Média: előző szám"); return true
         }
         if (pp.isNotEmpty() && t == pp) {
-            sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); toast("Media: lejatszas / szunet"); return true
+            sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); toast("Média: lejátszás / szünet"); return true
         }
         return false
     }
@@ -223,7 +223,7 @@ class CaptureService : Service() {
             audio.dispatchMediaKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0))
             mediaCount += 1
         } catch (e: Exception) {
-            toast("Media hiba: ${e.message}")
+            toast("Média hiba: ${e.message}")
         }
     }
 
@@ -324,7 +324,7 @@ class CaptureService : Service() {
                 uploadExecutor.execute { convertAndSavePng(tmp, baseName) }
             }
             override fun onError(code: Int, message: String, cause: Throwable?) {
-                toast("FOTO HIBA: $message")
+                toast("FOTÓ HIBA: $message")
             }
         })
     }
@@ -333,7 +333,7 @@ class CaptureService : Service() {
     private fun convertAndSavePng(tmpJpeg: java.io.File, baseName: String) {
         try {
             val bmp: Bitmap = BitmapFactory.decodeFile(tmpJpeg.absolutePath)
-                ?: run { toast("PNG hiba: nem dekodolhato"); return }
+                ?: run { toast("PNG hiba: nem dekódolható"); return }
 
             val pngBytes = ByteArrayOutputStream().use { bos ->
                 bmp.compress(Bitmap.CompressFormat.PNG, 100, bos)
@@ -365,7 +365,7 @@ class CaptureService : Service() {
 
             if (AppSettings.sftpEnabled(this)) uploadSftp(name, pngBytes)
         } catch (e: OutOfMemoryError) {
-            toast("PNG hiba: keves memoria")
+            toast("PNG hiba: kevés memória")
         } catch (e: Exception) {
             toast("PNG hiba: ${e.message}")
         }
@@ -395,7 +395,7 @@ class CaptureService : Service() {
             ensureRemoteDir(channel, dir)
             val remotePath = dir.trimEnd('/') + "/" + name
             ByteArrayInputStream(bytes).use { channel.put(it, remotePath) }
-            toast("SFTP feltoltve")
+            toast("SFTP feltöltve")
             webSocket?.send("uploaded")
         } catch (e: Exception) {
             toast("SFTP hiba: ${e.message}")
@@ -444,7 +444,7 @@ class CaptureService : Service() {
                 if (myGen != wsGeneration) return
                 if (handleModeMessage(text)) return
                 if (handleMediaCommand(text)) return
-                toast("Uzenet jott: $text")
+                toast("Üzenet jött: $text")
                 if (shouldTrigger(text)) {
                     handler.post { takePhoto() }
                 }
@@ -454,7 +454,7 @@ class CaptureService : Service() {
                 val t = bytes.utf8()
                 if (handleModeMessage(t)) return
                 if (handleMediaCommand(t)) return
-                toast("Binaris uzenet: $t")
+                toast("Bináris üzenet: $t")
                 if (shouldTrigger(t)) {
                     handler.post { takePhoto() }
                 }
@@ -498,7 +498,7 @@ class CaptureService : Service() {
 
     private fun startForegroundCompat() {
         val notif = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("WS REMCON aktiv")
+            .setContentTitle("WS REMCON aktív")
             .setContentText("WebSocket kapcsolat fenntartva")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setOngoing(true)
