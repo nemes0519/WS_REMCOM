@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Üres usb-device = minden csatlakoztatott USB eszközre matchel.
+         Ha csak egy konkrét kamerát akarsz, add meg a vendor-id / product-id értékeket. -->
+    <usb-device />
+</resources>
