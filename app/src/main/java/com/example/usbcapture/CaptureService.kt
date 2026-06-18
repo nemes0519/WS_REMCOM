@@ -19,6 +19,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Log
 import android.view.KeyEvent
@@ -86,6 +87,16 @@ class CaptureService : Service() {
     @Volatile private var previewing = false
 
     private var webSocket: WebSocket? = null
+    // minden uj kapcsolat noveli; a regi (stale) listener-hivasokat ez alapjan eldobjuk,
+    // igy soha nem marad ket elo kapcsolat, ami duplan kezelne ugyanazt az uzenetet
+    @Volatile private var wsGeneration = 0
+    private val reconnectRunnable = Runnable { connectWebSocket() }
+
+    // media parancs debounce: ugyanazt a billentyut <350 ms-en belul nem kuldjuk ujra,
+    // hogy egy esetleges duplikalt uzenet ne szamitson "dupla koppintasnak" (= next)
+    private var lastMediaKey = 0
+    private var lastMediaAt = 0L
+
     private val httpClient = OkHttpClient.Builder()
         .pingInterval(20, TimeUnit.SECONDS)
         .build()
@@ -199,9 +210,17 @@ class CaptureService : Service() {
 
     private fun sendMediaKey(keyCode: Int) {
         try {
+            val now = SystemClock.uptimeMillis()
+            // ugyanaz a billentyu 350 ms-en belul -> duplikatum, eldobjuk
+            // (kulonben a lejatszo "dupla koppintasnak" venne a pause-t es kovetkezore lepne)
+            if (keyCode == lastMediaKey && now - lastMediaAt < 350L) return
+            lastMediaKey = keyCode
+            lastMediaAt = now
+
             val audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
-            audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+            // egyertelmu, rovid lenyomas: azonos downTime a DOWN/UP-on
+            audio.dispatchMediaKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0))
+            audio.dispatchMediaKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0))
             mediaCount += 1
         } catch (e: Exception) {
             toast("Media hiba: ${e.message}")
@@ -405,17 +424,24 @@ class CaptureService : Service() {
 
     private fun connectWebSocket() {
         if (!serviceRunning) return
+        handler.removeCallbacks(reconnectRunnable)   // ne stackelodjon az ujracsatlakozas
+        val myGen = ++wsGeneration                   // ettol a regi listener-ek "stale"-lesznek
+        try { webSocket?.cancel() } catch (_: Exception) {}  // regi kapcsolat eldobasa
+        webSocket = null
+
         val url = AppSettings.wsUrl(this)
         val request = Request.Builder().url(url).build()
         webSocket = httpClient.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
+            override fun onOpen(ws: WebSocket, response: Response) {
+                if (myGen != wsGeneration) { ws.cancel(); return }
                 wsConnected = true
                 toast("WebSocket CSATLAKOZVA")
                 // csatlakozas utan rogton lekerdezzuk a szerver modjat
                 modePending = true
-                webSocket.send("mode?")
+                ws.send("mode?")
             }
-            override fun onMessage(webSocket: WebSocket, text: String) {
+            override fun onMessage(ws: WebSocket, text: String) {
+                if (myGen != wsGeneration) return
                 if (handleModeMessage(text)) return
                 if (handleMediaCommand(text)) return
                 toast("Uzenet jott: $text")
@@ -423,7 +449,8 @@ class CaptureService : Service() {
                     handler.post { takePhoto() }
                 }
             }
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+            override fun onMessage(ws: WebSocket, bytes: ByteString) {
+                if (myGen != wsGeneration) return
                 val t = bytes.utf8()
                 if (handleModeMessage(t)) return
                 if (handleMediaCommand(t)) return
@@ -432,14 +459,16 @@ class CaptureService : Service() {
                     handler.post { takePhoto() }
                 }
             }
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
+                if (myGen != wsGeneration) return
                 wsConnected = false
                 deviceMode = -1
                 modePending = false
                 toast("WebSocket HIBA: ${t.message}")
                 reconnectLater()
             }
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            override fun onClosed(ws: WebSocket, code: Int, reason: String) {
+                if (myGen != wsGeneration) return
                 wsConnected = false
                 deviceMode = -1
                 modePending = false
@@ -449,7 +478,8 @@ class CaptureService : Service() {
     }
 
     private fun reconnectLater() {
-        handler.postDelayed({ connectWebSocket() }, 5000)
+        handler.removeCallbacks(reconnectRunnable)   // csak egy ujracsatlakozas legyen fuggoben
+        handler.postDelayed(reconnectRunnable, 5000)
     }
 
     private fun acquireWakeLock() {
@@ -487,7 +517,10 @@ class CaptureService : Service() {
         cameraReady = false
         deviceMode = -1
         modePending = false
-        webSocket?.close(1000, null)
+        wsGeneration++                                 // fuggoben levo listener-hivasok stale-lesznek
+        handler.removeCallbacks(reconnectRunnable)      // ne legyen ujracsatlakozas leallitas utan
+        try { webSocket?.cancel() } catch (_: Exception) {}
+        webSocket = null
         try { cameraHelper?.release() } catch (_: Exception) {}
         uploadExecutor.shutdown()
         wakeLock?.let { if (it.isHeld) it.release() }
