@@ -35,8 +35,8 @@ import androidx.core.content.ContextCompat
  * Inditokepernyo + allapotkijelzo + beallitasok.
  *  - elkeri az engedelyeket es elinditja a hatterszolgaltatast
  *  - elo allapotot mutat (zold/piros pottyel a WebSocket es a Kamera)
- *  - "Beallitasok": WebSocket URL, fenykep mappa, SFTP/SSH szerkesztese
- *  - "Szolgaltatas inditasa" / "Szolgaltatas leallitasa": kezi vezerles
+ *  - "Beállítások": WebSocket URL, fenykep mappa, SFTP/SSH szerkesztese
+ *  - "Szolgáltatás indítása" / "Szolgáltatás leállítása": kezi vezerles
  *
  * Ha kesobb ujra radugsz egy USB kamerat, az app az USB_DEVICE_ATTACHED
  * miatt ujraindul es a service megint elindul - mint eddig.
@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
             setTypeface(typeface, Typeface.BOLD)
         })
         header.addView(TextView(this).apply {
-            text = "Hatterben fut: WebSocket -> foto + SFTP / media vezerles"
+            text = "Háttérben fut: WebSocket → fotó + SFTP / média vezérlés"
             setTextColor(cHeaderSub)
             textSize = 12f
             setPadding(0, dp(4), 0, 0)
@@ -148,7 +148,7 @@ class MainActivity : ComponentActivity() {
 
         // allapot kartya
         val statusCard = cardView()
-        statusCard.addView(sectionTitle("ALLAPOT"))
+        statusCard.addView(sectionTitle("ÁLLAPOT"))
 
         // Szolgaltatas sor (ugyanolyan stilus, mint a WebSocket es Kamera)
         val svcRow = rowView()
@@ -156,7 +156,7 @@ class MainActivity : ComponentActivity() {
         svcRow.addView(svcDot, dotLp())
         val svcCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         svcCol.addView(TextView(this).apply {
-            text = "Szolgaltatas"; setTextColor(cTextMain); textSize = 15f
+            text = "Szolgáltatás"; setTextColor(cTextMain); textSize = 15f
             setTypeface(typeface, Typeface.BOLD)
         })
         svcValue = TextView(this).apply { textSize = 14f; setTextColor(cTextSub) }
@@ -211,7 +211,7 @@ class MainActivity : ComponentActivity() {
 
         // uzemmod kartya
         val modeCard = cardView()
-        modeCard.addView(sectionTitle("UZEMMOD"))
+        modeCard.addView(sectionTitle("ÜZEMMÓD"))
 
         modeBadge = TextView(this).apply {
             text = "Ismeretlen"
@@ -229,7 +229,7 @@ class MainActivity : ComponentActivity() {
         ).apply { topMargin = dp(10); gravity = Gravity.CENTER_HORIZONTAL })
 
         modeSubText = TextView(this).apply {
-            text = "A mod a WebSocket csatlakozasa utan kerdezheto le."
+            text = "A mód a WebSocket csatlakozása után kérdezhető le."
             textSize = 12f
             setTextColor(cTextSub)
             gravity = Gravity.CENTER
@@ -237,7 +237,7 @@ class MainActivity : ComponentActivity() {
         }
         modeCard.addView(modeSubText)
 
-        modeSwitchBtn = filledButton("Mod valtasa", cPurple)
+        modeSwitchBtn = filledButton("Mód váltása", cPurple)
         modeSwitchBtn.setOnClickListener { switchMode() }
         modeCard.addView(modeSwitchBtn, lp(top = dp(8)))
 
@@ -246,25 +246,25 @@ class MainActivity : ComponentActivity() {
         // gombok
         // vezerles kartya: a harom gomb egy helyen
         val controlCard = cardView()
-        controlCard.addView(sectionTitle("VEZERLES"))
+        controlCard.addView(sectionTitle("VEZÉRLÉS"))
 
-        val settingsBtn = filledButton("Beallitasok", cBlue)
+        val settingsBtn = filledButton("Beállítások", cBlue)
         settingsBtn.setOnClickListener { showSettingsDialog() }
         controlCard.addView(settingsBtn, lp(top = dp(10)))
 
-        val startBtn = filledButton("Szolgaltatas inditasa", cGreen)
+        val startBtn = filledButton("Szolgáltatás indítása", cGreen)
         startBtn.setOnClickListener { startServiceManually() }
         controlCard.addView(startBtn, lp(top = dp(10)))
 
-        val stopBtn = filledButton("Szolgaltatas leallitasa", cRed)
+        val stopBtn = filledButton("Szolgáltatás leállítása", cRed)
         stopBtn.setOnClickListener { confirmStop() }
         controlCard.addView(stopBtn, lp(top = dp(10)))
 
         root.addView(controlCard)
 
         root.addView(TextView(this).apply {
-            text = "Ha ujra csatlakoztatsz egy USB kamerat, a szolgaltatas " +
-                    "automatikusan ujraindul."
+            text = "Ha újra csatlakoztatsz egy USB kamerát, a szolgáltatás " +
+                    "automatikusan újraindul."
             textSize = 12f; setTextColor(cTextSub)
             setPadding(dp(4), dp(16), dp(4), 0)
         })
@@ -279,7 +279,7 @@ class MainActivity : ComponentActivity() {
         val cam = CaptureService.cameraReady
 
         svcDot.background = dotDrawable(if (running) cGreen else cRed)
-        svcValue.text = if (running) "FUT" else "LEALLITVA"
+        svcValue.text = if (running) "FUT" else "LEÁLLÍTVA"
         svcValue.setTextColor(if (running) cGreen else cRed)
 
         wsDot.background = dotDrawable(if (ws) cGreen else cRed)
@@ -290,7 +290,7 @@ class MainActivity : ComponentActivity() {
         camValue.text = if (cam) "Kesz - ${CaptureService.cameraInfo}" else "Nincs csatlakoztatva"
 
         val sb = StringBuilder()
-        sb.append("Mentes helye:  DCIM/").append(AppSettings.album(this)).append("\n")
+        sb.append("Mentés helye:  DCIM/").append(AppSettings.album(this)).append("\n")
         if (AppSettings.sftpEnabled(this)) {
             sb.append("SFTP:  ").append(AppSettings.sftpHost(this))
                 .append(":").append(AppSettings.sftpPort(this)).append("\n")
@@ -298,13 +298,13 @@ class MainActivity : ComponentActivity() {
         } else {
             sb.append("SFTP:  kikapcsolva\n")
         }
-        sb.append("Media parancsok:  ")
+        sb.append("Média parancsok:  ")
             .append(AppSettings.cmdNext(this)).append(" / ")
             .append(AppSettings.cmdPrev(this)).append(" / ")
             .append(AppSettings.cmdPlayPause(this)).append("\n")
-        sb.append("Keszult kepek:  ").append(CaptureService.photoCount).append("\n")
-        sb.append("Media esemenyek:  ").append(CaptureService.mediaCount).append("\n")
-        sb.append("Utolso esemeny:  ").append(CaptureService.lastEvent)
+        sb.append("Készült képek:  ").append(CaptureService.photoCount).append("\n")
+        sb.append("Média események:  ").append(CaptureService.mediaCount).append("\n")
+        sb.append("Utolsó esemény:  ").append(CaptureService.lastEvent)
         infoText.text = sb.toString()
 
         refreshModeUi(ws)
@@ -319,38 +319,38 @@ class MainActivity : ComponentActivity() {
         when {
             !wsConnected -> {
                 styleModeBadge("Nincs kapcsolat", cTextSub, cGraySoft)
-                modeSubText.text = "A mod a WebSocket csatlakozasa utan kerdezheto le."
+                modeSubText.text = "A mód a WebSocket csatlakozása után kérdezhető le."
                 modeSwitchBtn.isEnabled = false
                 modeSwitchBtn.alpha = 0.5f
-                modeSwitchBtn.text = "Mod valtasa"
+                modeSwitchBtn.text = "Mód váltása"
             }
             pending -> {
                 styleModeBadge("Lekerdezes...", cTextSub, cGraySoft)
-                modeSubText.text = "Valaszra varunk a szervertol."
+                modeSubText.text = "Válaszra várunk a szervertől."
                 modeSwitchBtn.isEnabled = false
                 modeSwitchBtn.alpha = 0.5f
-                modeSwitchBtn.text = "Mod valtasa"
+                modeSwitchBtn.text = "Mód váltása"
             }
             mode == 0 -> {
                 styleModeBadge("Remote Controller", cBlue, cBlueSoft)
-                modeSubText.text = "Aktiv mod: mode0"
+                modeSubText.text = "Aktív mód: mode0"
                 modeSwitchBtn.isEnabled = true
                 modeSwitchBtn.alpha = 1f
-                modeSwitchBtn.text = "Valtas: Audio Controller"
+                modeSwitchBtn.text = "Váltás: Audio Controller"
             }
             mode == 1 -> {
                 styleModeBadge("Audio Controller", cPurple, cPurpleSoft)
-                modeSubText.text = "Aktiv mod: mode1"
+                modeSubText.text = "Aktív mód: mode1"
                 modeSwitchBtn.isEnabled = true
                 modeSwitchBtn.alpha = 1f
-                modeSwitchBtn.text = "Valtas: Remote Controller"
+                modeSwitchBtn.text = "Váltás: Remote Controller"
             }
             else -> {
                 styleModeBadge("Ismeretlen", cTextSub, cGraySoft)
                 modeSubText.text = "Nem jott meg valasz, probald ujra."
                 modeSwitchBtn.isEnabled = true
                 modeSwitchBtn.alpha = 1f
-                modeSwitchBtn.text = "Mod lekerdezese"
+                modeSwitchBtn.text = "Mód lekérdezése"
             }
         }
     }
@@ -391,23 +391,23 @@ class MainActivity : ComponentActivity() {
 
         val wsField = field(form, "WebSocket URL", AppSettings.wsUrl(this),
             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
-        val albumField = field(form, "Fenykepek mappa (a DCIM-en belul)",
+        val albumField = field(form, "Fényképek mappa (a DCIM-en belül)",
             AppSettings.album(this), InputType.TYPE_CLASS_TEXT)
 
-        form.addView(sectionTitle("MEDIA VEZERLES (zenelejatszo)")
+        form.addView(sectionTitle("MÉDIA VEZÉRLÉS (zenelejátszó)")
             .apply { setPadding(0, dp(20), 0, dp(2)) })
 
-        val nextField = field(form, "Kovetkezo szam parancs",
+        val nextField = field(form, "Következő szám parancs",
             AppSettings.cmdNext(this), InputType.TYPE_CLASS_TEXT)
-        val prevField = field(form, "Elozo szam parancs",
+        val prevField = field(form, "Előző szám parancs",
             AppSettings.cmdPrev(this), InputType.TYPE_CLASS_TEXT)
-        val playPauseField = field(form, "Lejatszas / szunet parancs",
+        val playPauseField = field(form, "Lejátszás / szünet parancs",
             AppSettings.cmdPlayPause(this), InputType.TYPE_CLASS_TEXT)
 
         form.addView(sectionTitle("SFTP / SSH").apply { setPadding(0, dp(20), 0, dp(2)) })
 
         val sftpCheck = CheckBox(this).apply {
-            text = "SFTP feltoltes bekapcsolva"
+            text = "SFTP feltöltés bekapcsolva"
             isChecked = AppSettings.sftpEnabled(this@MainActivity)
         }
         form.addView(sftpCheck)
@@ -416,11 +416,11 @@ class MainActivity : ComponentActivity() {
             InputType.TYPE_CLASS_TEXT)
         val portField = field(form, "SFTP port", AppSettings.sftpPort(this).toString(),
             InputType.TYPE_CLASS_NUMBER)
-        val userField = field(form, "SFTP felhasznalo", AppSettings.sftpUser(this),
+        val userField = field(form, "SFTP felhasználó", AppSettings.sftpUser(this),
             InputType.TYPE_CLASS_TEXT)
-        val passField = field(form, "SFTP jelszo", AppSettings.sftpPass(this),
+        val passField = field(form, "SFTP jelszó", AppSettings.sftpPass(this),
             InputType.TYPE_CLASS_TEXT)
-        val dirField = field(form, "SFTP tavoli mappa", AppSettings.sftpDir(this),
+        val dirField = field(form, "SFTP távoli mappa", AppSettings.sftpDir(this),
             InputType.TYPE_CLASS_TEXT)
 
         val resetBtn = Button(this).apply {
@@ -447,9 +447,9 @@ class MainActivity : ComponentActivity() {
         val scroll = ScrollView(this).apply { addView(form) }
 
         AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
-            .setTitle("Beallitasok")
+            .setTitle("Beállítások")
             .setView(scroll)
-            .setPositiveButton("Mentes") { _, _ ->
+            .setPositiveButton("Mentés") { _, _ ->
                 val port = portField.text.toString().trim().toIntOrNull()
                     ?: AppSettings.DEF_SFTP_PORT
                 AppSettings.save(
@@ -466,11 +466,11 @@ class MainActivity : ComponentActivity() {
                     cmdPrev = prevField.text.toString(),
                     cmdPlayPause = playPauseField.text.toString()
                 )
-                Toast.makeText(this, "Beallitasok mentve", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Beállítások mentve", Toast.LENGTH_SHORT).show()
                 notifyServiceSettingsChanged()
                 refreshStatus()
             }
-            .setNegativeButton("Megse", null)
+            .setNegativeButton("Mégse", null)
             .show()
     }
 
@@ -490,13 +490,13 @@ class MainActivity : ComponentActivity() {
 
     private fun confirmStop() {
         AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
-            .setTitle("Szolgaltatas leallitasa")
+            .setTitle("Szolgáltatás leállítása")
             .setMessage(
-                "Biztosan leallitod a hatterszolgaltatast? " +
-                        "A kamera figyelese es a WebSocket kapcsolat is megszakad."
+                "Biztosan leállítod a háttérszolgáltatást? " +
+                        "A kamera figyelése és a WebSocket kapcsolat is megszakad."
             )
-            .setPositiveButton("Leallitas") { _, _ -> stopCaptureService() }
-            .setNegativeButton("Megse", null)
+            .setPositiveButton("Leállítás") { _, _ -> stopCaptureService() }
+            .setNegativeButton("Mégse", null)
             .show()
     }
 
@@ -517,11 +517,11 @@ class MainActivity : ComponentActivity() {
 
     private fun startServiceManually() {
         if (CaptureService.serviceRunning) {
-            Toast.makeText(this, "A szolgaltatas mar fut", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "A szolgáltatás már fut", Toast.LENGTH_SHORT).show()
             return
         }
         startCaptureService()
-        Toast.makeText(this, "Szolgaltatas inditasa...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Szolgáltatás indítása...", Toast.LENGTH_SHORT).show()
         handler.postDelayed({ refreshStatus() }, 500)
     }
 
