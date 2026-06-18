@@ -521,6 +521,12 @@ class CaptureService : Service() {
         handler.removeCallbacks(reconnectRunnable)      // ne legyen ujracsatlakozas leallitas utan
         try { webSocket?.cancel() } catch (_: Exception) {}
         webSocket = null
+        // az OkHttp eroforrasok azonnali felszabaditasa, hogy semmi ne ragadjon be
+        // (cancel() utan kulonben ~60 mp-ig elnek meg az uresjarati szalak / a kapcsolat a poolban)
+        try {
+            httpClient.dispatcher.executorService.shutdown()
+            httpClient.connectionPool.evictAll()
+        } catch (_: Exception) {}
         try { cameraHelper?.release() } catch (_: Exception) {}
         uploadExecutor.shutdown()
         wakeLock?.let { if (it.isHeld) it.release() }
