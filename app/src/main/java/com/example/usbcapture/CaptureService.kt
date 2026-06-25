@@ -195,6 +195,8 @@ class CaptureService : Service() {
         val next = AppSettings.cmdNext(this).trim().lowercase(Locale.US)
         val prev = AppSettings.cmdPrev(this).trim().lowercase(Locale.US)
         val pp = AppSettings.cmdPlayPause(this).trim().lowercase(Locale.US)
+        val volUp = AppSettings.cmdVolUp(this).trim().lowercase(Locale.US)
+        val volDown = AppSettings.cmdVolDown(this).trim().lowercase(Locale.US)
 
         if (next.isNotEmpty() && t == next) {
             sendMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT); toast("Média: következő szám"); return true
@@ -204,6 +206,12 @@ class CaptureService : Service() {
         }
         if (pp.isNotEmpty() && t == pp) {
             sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); toast("Média: lejátszás / szünet"); return true
+        }
+        if (volUp.isNotEmpty() && t == volUp) {
+            adjustVolume(AudioManager.ADJUST_RAISE); toast("Hangerő: fel (+1)"); return true
+        }
+        if (volDown.isNotEmpty() && t == volDown) {
+            adjustVolume(AudioManager.ADJUST_LOWER); toast("Hangerő: le (-1)"); return true
         }
         return false
     }
@@ -224,6 +232,38 @@ class CaptureService : Service() {
             mediaCount += 1
         } catch (e: Exception) {
             toast("Média hiba: ${e.message}")
+        }
+    }
+
+    /**
+     * Egy lepessel allitja a hangerot, pontosan ugy, mint a fizikai hangero
+     * gomb: automatikusan az EPPEN AKTIV hangfolyamot valtoztatja -
+     *   - zenehallgatas kozben (Bluetooth A2DP is) a media hangerot,
+     *   - hivas kozben (Bluetooth headset / SCO is) a hivas hangerot.
+     * A direction az AudioManager.ADJUST_RAISE vagy ADJUST_LOWER, a
+     * FLAG_SHOW_UI megjeleniti a rendszer hangero-csuszkajat.
+     *
+     * Nincs debounce: minden uzenet pontosan egy lepes, igy tobb egymas
+     * utani parancs tobbet lep (felhuzhato/lehuzhato).
+     *
+     * USE_DEFAULT_STREAM_TYPE = "valaszd ki magad az aktiv folyamot", ez a
+     * fizikai gomb viselkedese. (Ha eppen semmi nem szol es nincs hivas, a
+     * csengetes hangerejere eshet - de zene / hivas kozben mindig a jora.)
+     *
+     * Ha valaha CSAK a media hangerot akarnad allitani (akkor is, ha epp
+     * nem szol semmi), hasznald helyette ezt:
+     *   audio.adjustStreamVolume(
+     *       AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
+     */
+    private fun adjustVolume(direction: Int) {
+        try {
+            val audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            audio.adjustSuggestedStreamVolume(
+                direction, AudioManager.USE_DEFAULT_STREAM_TYPE, AudioManager.FLAG_SHOW_UI
+            )
+            mediaCount += 1
+        } catch (e: Exception) {
+            toast("Hangerő hiba: ${e.message}")
         }
     }
 
