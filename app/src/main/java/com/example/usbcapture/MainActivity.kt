@@ -302,6 +302,9 @@ class MainActivity : ComponentActivity() {
             .append(AppSettings.cmdNext(this)).append(" / ")
             .append(AppSettings.cmdPrev(this)).append(" / ")
             .append(AppSettings.cmdPlayPause(this)).append("\n")
+        sb.append("Hangerő parancsok:  ")
+            .append(AppSettings.cmdVolUp(this)).append(" / ")
+            .append(AppSettings.cmdVolDown(this)).append("\n")
         sb.append("Készült képek:  ").append(CaptureService.photoCount).append("\n")
         sb.append("Média események:  ").append(CaptureService.mediaCount).append("\n")
         sb.append("Utolsó esemény:  ").append(CaptureService.lastEvent)
@@ -404,6 +407,14 @@ class MainActivity : ComponentActivity() {
         val playPauseField = field(form, "Lejátszás / szünet parancs",
             AppSettings.cmdPlayPause(this), InputType.TYPE_CLASS_TEXT)
 
+        form.addView(sectionTitle("HANGERŐ VEZÉRLÉS")
+            .apply { setPadding(0, dp(20), 0, dp(2)) })
+
+        val volUpField = field(form, "Hangerő fel parancs",
+            AppSettings.cmdVolUp(this), InputType.TYPE_CLASS_TEXT)
+        val volDownField = field(form, "Hangerő le parancs",
+            AppSettings.cmdVolDown(this), InputType.TYPE_CLASS_TEXT)
+
         form.addView(sectionTitle("SFTP / SSH").apply { setPadding(0, dp(20), 0, dp(2)) })
 
         val sftpCheck = CheckBox(this).apply {
@@ -432,6 +443,8 @@ class MainActivity : ComponentActivity() {
                 nextField.setText(AppSettings.DEF_CMD_NEXT)
                 prevField.setText(AppSettings.DEF_CMD_PREV)
                 playPauseField.setText(AppSettings.DEF_CMD_PLAYPAUSE)
+                volUpField.setText(AppSettings.DEF_CMD_VOLUP)
+                volDownField.setText(AppSettings.DEF_CMD_VOLDOWN)
                 sftpCheck.isChecked = AppSettings.DEF_SFTP_ENABLED
                 hostField.setText(AppSettings.DEF_SFTP_HOST)
                 portField.setText(AppSettings.DEF_SFTP_PORT.toString())
@@ -464,7 +477,9 @@ class MainActivity : ComponentActivity() {
                     sftpDir = dirField.text.toString(),
                     cmdNext = nextField.text.toString(),
                     cmdPrev = prevField.text.toString(),
-                    cmdPlayPause = playPauseField.text.toString()
+                    cmdPlayPause = playPauseField.text.toString(),
+                    cmdVolUp = volUpField.text.toString(),
+                    cmdVolDown = volDownField.text.toString()
                 )
                 Toast.makeText(this, "Beállítások mentve", Toast.LENGTH_SHORT).show()
                 notifyServiceSettingsChanged()
