@@ -30,6 +30,10 @@ object AppSettings {
     private const val K_CMD_PREV = "cmd_prev"
     private const val K_CMD_PLAYPAUSE = "cmd_playpause"
 
+    // hangero vezerles parancsai
+    private const val K_CMD_VOLUP = "cmd_volup"
+    private const val K_CMD_VOLDOWN = "cmd_voldown"
+
     // ===================== ALAP BEALLITASOK =====================
     const val DEF_WS_URL = "wss://socket.levstack.hu/sound"
     const val DEF_ALBUM = "DCIM2"
@@ -45,6 +49,10 @@ object AppSettings {
     const val DEF_CMD_NEXT = "next"
     const val DEF_CMD_PREV = "prev"
     const val DEF_CMD_PLAYPAUSE = "pause"
+
+    // hangero vezerles alapertelmezett parancsai - az appbol szerkesztheto
+    const val DEF_CMD_VOLUP = "hangerofel"
+    const val DEF_CMD_VOLDOWN = "hangerole"
     // ============================================================
 
     private fun prefs(ctx: Context) =
@@ -83,6 +91,12 @@ object AppSettings {
     fun cmdPlayPause(ctx: Context): String =
         prefs(ctx).getString(K_CMD_PLAYPAUSE, DEF_CMD_PLAYPAUSE) ?: DEF_CMD_PLAYPAUSE
 
+    fun cmdVolUp(ctx: Context): String =
+        prefs(ctx).getString(K_CMD_VOLUP, DEF_CMD_VOLUP) ?: DEF_CMD_VOLUP
+
+    fun cmdVolDown(ctx: Context): String =
+        prefs(ctx).getString(K_CMD_VOLDOWN, DEF_CMD_VOLDOWN) ?: DEF_CMD_VOLDOWN
+
     fun save(
         ctx: Context,
         wsUrl: String,
@@ -95,7 +109,9 @@ object AppSettings {
         sftpDir: String,
         cmdNext: String,
         cmdPrev: String,
-        cmdPlayPause: String
+        cmdPlayPause: String,
+        cmdVolUp: String,
+        cmdVolDown: String
     ) {
         prefs(ctx).edit()
             .putString(K_WS_URL, wsUrl.trim())
@@ -109,6 +125,8 @@ object AppSettings {
             .putString(K_CMD_NEXT, cmdNext.trim())
             .putString(K_CMD_PREV, cmdPrev.trim())
             .putString(K_CMD_PLAYPAUSE, cmdPlayPause.trim())
+            .putString(K_CMD_VOLUP, cmdVolUp.trim())
+            .putString(K_CMD_VOLDOWN, cmdVolDown.trim())
             .apply()
     }
 }
