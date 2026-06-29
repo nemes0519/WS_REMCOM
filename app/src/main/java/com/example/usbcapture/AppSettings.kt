@@ -34,6 +34,10 @@ object AppSettings {
     private const val K_CMD_VOLUP = "cmd_volup"
     private const val K_CMD_VOLDOWN = "cmd_voldown"
 
+    // beepitett kamera figyeles (kulon ki/be kapcsolhato szolgaltatas)
+    private const val K_PHOTO_WATCH_ENABLED = "photo_watch_enabled"
+    private const val K_PHOTO_WATCH_FOLDER = "photo_watch_folder"
+
     // ===================== ALAP BEALLITASOK =====================
     const val DEF_WS_URL = "wss://socket.levstack.hu/sound"
     const val DEF_ALBUM = "DCIM2"
@@ -53,6 +57,12 @@ object AppSettings {
     // hangero vezerles alapertelmezett parancsai - az appbol szerkesztheto
     const val DEF_CMD_VOLUP = "hangerofel"
     const val DEF_CMD_VOLDOWN = "hangerole"
+
+    // beepitett kamera figyeles alapertekei
+    // alapbol KIKAPCSOLVA (a felhasznalo kapcsolja be a fo kepernyon);
+    // a figyelt mappa a DCIM-en belul (a legtobb telefonon "Camera")
+    const val DEF_PHOTO_WATCH_ENABLED = false
+    const val DEF_PHOTO_WATCH_FOLDER = "Camera"
     // ============================================================
 
     private fun prefs(ctx: Context) =
@@ -97,6 +107,21 @@ object AppSettings {
     fun cmdVolDown(ctx: Context): String =
         prefs(ctx).getString(K_CMD_VOLDOWN, DEF_CMD_VOLDOWN) ?: DEF_CMD_VOLDOWN
 
+    fun photoWatchEnabled(ctx: Context): Boolean =
+        prefs(ctx).getBoolean(K_PHOTO_WATCH_ENABLED, DEF_PHOTO_WATCH_ENABLED)
+
+    fun photoWatchFolder(ctx: Context): String =
+        prefs(ctx).getString(K_PHOTO_WATCH_FOLDER, DEF_PHOTO_WATCH_FOLDER) ?: DEF_PHOTO_WATCH_FOLDER
+
+    /**
+     * A figyeles ki/be kapcsolasa kulon, sajat metoduson keresztul tarolodik
+     * (a fo kepernyo kapcsoloja allitja). Igy a Beallitasok parbeszedablak
+     * mentese (save) NEM irja felul ezt az allapotot.
+     */
+    fun setPhotoWatchEnabled(ctx: Context, enabled: Boolean) {
+        prefs(ctx).edit().putBoolean(K_PHOTO_WATCH_ENABLED, enabled).apply()
+    }
+
     fun save(
         ctx: Context,
         wsUrl: String,
@@ -111,7 +136,8 @@ object AppSettings {
         cmdPrev: String,
         cmdPlayPause: String,
         cmdVolUp: String,
-        cmdVolDown: String
+        cmdVolDown: String,
+        photoWatchFolder: String
     ) {
         prefs(ctx).edit()
             .putString(K_WS_URL, wsUrl.trim())
@@ -127,6 +153,7 @@ object AppSettings {
             .putString(K_CMD_PLAYPAUSE, cmdPlayPause.trim())
             .putString(K_CMD_VOLUP, cmdVolUp.trim())
             .putString(K_CMD_VOLDOWN, cmdVolDown.trim())
+            .putString(K_PHOTO_WATCH_FOLDER, photoWatchFolder.trim())
             .apply()
     }
 }
