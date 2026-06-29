@@ -12,6 +12,14 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
+    <!-- beepitett kamera figyeles: adatszinkron tipusu eloterbeli szolgaltatas -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- a kepek olvasasahoz (uj fotok eszlelese a MediaStore-bol) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <uses-feature android:name="android.hardware.usb.host" android:required="true" />
 
     <application
@@ -41,5 +49,10 @@
             android:name="com.example.usbcapture.CaptureService"
             android:exported="false"
             android:foregroundServiceType="camera" />
+
+        <service
+            android:name="com.example.usbcapture.PhotoWatchService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>
