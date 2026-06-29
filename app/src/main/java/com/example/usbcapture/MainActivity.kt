@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -73,6 +74,15 @@ class MainActivity : ComponentActivity() {
     private lateinit var modeSubText: TextView
     private lateinit var modeSwitchBtn: Button
 
+    // beepitett kamera figyeles kartya elemei
+    private lateinit var pwDot: View
+    private lateinit var pwValue: TextView
+    private lateinit var pwInfo: TextView
+    private lateinit var pwToggleBtn: Button
+
+    // az app aktualis verzioneve (a build.gradle versionName-mel osszhangban)
+    private val appVersionName = "1.1"
+
     private val handler = Handler(Looper.getMainLooper())
     private val refreshRunnable = object : Runnable {
         override fun run() {
@@ -85,6 +95,22 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
         startCaptureService()
+    }
+
+    // a beepitett kamera figyelesehez a kepek olvasasa kell - ezt a kapcsolo
+    // bekapcsolasakor kerjuk el (nem az app inditasakor), igy opcionalis marad
+    private val photoPermLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        if (result.values.all { it }) {
+            enablePhotoWatch()
+        } else {
+            Toast.makeText(
+                this,
+                "Engedély nélkül nem indítható a beépített kamera figyelése",
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -102,6 +128,12 @@ class MainActivity : ComponentActivity() {
             perms.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
         permLauncher.launch(perms.toTypedArray())
+
+        // ha a beepitett kamera figyeles korabban be volt kapcsolva es megvan
+        // a kepek olvasasi engedelye, akkor inditsuk ujra automatikusan
+        if (AppSettings.photoWatchEnabled(this) && hasPhotoReadPermission()) {
+            startPhotoWatchService()
+        }
     }
 
     override fun onResume() {
@@ -243,6 +275,36 @@ class MainActivity : ComponentActivity() {
 
         root.addView(modeCard, lp(bottom = dp(14)))
 
+        // beepitett kamera -> SFTP kartya (kulon ki/be kapcsolhato szolgaltatas)
+        val pwCard = cardView()
+        pwCard.addView(sectionTitle("BEÉPÍTETT KAMERA → SFTP"))
+
+        val pwRow = rowView()
+        pwDot = dotView()
+        pwRow.addView(pwDot, dotLp())
+        val pwCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        pwCol.addView(TextView(this).apply {
+            text = "Figyelés"; setTextColor(cTextMain); textSize = 15f
+            setTypeface(typeface, Typeface.BOLD)
+        })
+        pwValue = TextView(this).apply { textSize = 14f; setTextColor(cTextSub) }
+        pwCol.addView(pwValue)
+        pwRow.addView(pwCol)
+        pwCard.addView(pwRow, lp(top = dp(6)))
+
+        pwInfo = TextView(this).apply {
+            textSize = 13f; setTextColor(cTextMain)
+            setLineSpacing(dp(5).toFloat(), 1f)
+            setPadding(0, dp(12), 0, 0)
+        }
+        pwCard.addView(pwInfo)
+
+        pwToggleBtn = filledButton("Bekapcsolás", cGreen)
+        pwToggleBtn.setOnClickListener { togglePhotoWatch() }
+        pwCard.addView(pwToggleBtn, lp(top = dp(12)))
+
+        root.addView(pwCard, lp(bottom = dp(14)))
+
         // gombok
         // vezerles kartya: a harom gomb egy helyen
         val controlCard = cardView()
@@ -267,6 +329,13 @@ class MainActivity : ComponentActivity() {
                     "automatikusan újraindul."
             textSize = 12f; setTextColor(cTextSub)
             setPadding(dp(4), dp(16), dp(4), 0)
+        })
+
+        root.addView(TextView(this).apply {
+            text = "WS REMCON · v$appVersionName"
+            textSize = 11f; setTextColor(cTextSub)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(18), 0, 0)
         })
 
         scroll.addView(root)
@@ -311,6 +380,7 @@ class MainActivity : ComponentActivity() {
         infoText.text = sb.toString()
 
         refreshModeUi(ws)
+        refreshPhotoWatchUi()
     }
 
     // -------------------------- Uzemmod --------------------------
@@ -384,6 +454,96 @@ class MainActivity : ComponentActivity() {
         refreshStatus()
     }
 
+    // -------------------------- Beepitett kamera figyeles --------------------------
+
+    private fun refreshPhotoWatchUi() {
+        val enabled = AppSettings.photoWatchEnabled(this)
+        val running = PhotoWatchService.running
+        val wsOk = PhotoWatchService.wsConnected
+
+        val dotColor = when {
+            running -> cGreen
+            enabled -> cRed       // be van kapcsolva, de valamiert nem fut
+            else -> cGray
+        }
+        pwDot.background = dotDrawable(dotColor)
+
+        pwValue.text = when {
+            running && wsOk -> "FUT · WS kapcsolódva"
+            running -> "FUT · WS nincs"
+            enabled -> "BE (nem fut)"
+            else -> "KIKAPCSOLVA"
+        }
+        pwValue.setTextColor(if (running) cGreen else if (enabled) cRed else cTextSub)
+
+        val sb = StringBuilder()
+        sb.append("Figyelt mappa:  DCIM/").append(AppSettings.photoWatchFolder(this)).append("\n")
+        sb.append("Feltöltve:  ").append(PhotoWatchService.uploadCount).append("\n")
+        sb.append("Utolsó fájl:  ").append(PhotoWatchService.lastFile).append("\n")
+        sb.append("Utolsó esemény:  ").append(PhotoWatchService.lastEvent)
+        pwInfo.text = sb.toString()
+
+        if (running) {
+            pwToggleBtn.text = "Kikapcsolás"
+            setButtonColor(pwToggleBtn, cRed)
+        } else {
+            pwToggleBtn.text = "Bekapcsolás"
+            setButtonColor(pwToggleBtn, cGreen)
+        }
+    }
+
+    private fun togglePhotoWatch() {
+        if (PhotoWatchService.running) {
+            disablePhotoWatch()
+        } else {
+            // ha mar megvan a kepek olvasasi engedelye, egybol indithatunk;
+            // kulonben eloszor elkerjuk (a valasz a photoPermLauncher-be jon)
+            if (hasPhotoReadPermission()) {
+                enablePhotoWatch()
+            } else {
+                photoPermLauncher.launch(photoReadPermissions())
+            }
+        }
+    }
+
+    private fun enablePhotoWatch() {
+        AppSettings.setPhotoWatchEnabled(this, true)
+        startPhotoWatchService()
+        Toast.makeText(this, "Beépített kamera figyelés bekapcsolva", Toast.LENGTH_SHORT).show()
+        handler.postDelayed({ refreshStatus() }, 400)
+    }
+
+    private fun disablePhotoWatch() {
+        AppSettings.setPhotoWatchEnabled(this, false)
+        stopPhotoWatchService()
+        // azonnali visszajelzes; a service onDestroy ugyanezt beallitja
+        PhotoWatchService.running = false
+        PhotoWatchService.wsConnected = false
+        Toast.makeText(this, "Beépített kamera figyelés kikapcsolva", Toast.LENGTH_SHORT).show()
+        refreshStatus()
+    }
+
+    private fun startPhotoWatchService() {
+        val i = Intent(this, PhotoWatchService::class.java)
+        ContextCompat.startForegroundService(this, i)
+    }
+
+    private fun stopPhotoWatchService() {
+        stopService(Intent(this, PhotoWatchService::class.java))
+    }
+
+    private fun photoReadPermissions(): Array<String> =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+        } else {
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+
+    private fun hasPhotoReadPermission(): Boolean =
+        photoReadPermissions().all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
+
     // -------------------------- Beallitasok --------------------------
 
     private fun showSettingsDialog() {
@@ -434,6 +594,12 @@ class MainActivity : ComponentActivity() {
         val dirField = field(form, "SFTP távoli mappa", AppSettings.sftpDir(this),
             InputType.TYPE_CLASS_TEXT)
 
+        form.addView(sectionTitle("BEÉPÍTETT KAMERA → SFTP")
+            .apply { setPadding(0, dp(20), 0, dp(2)) })
+
+        val watchFolderField = field(form, "Figyelt mappa (a DCIM-en belül)",
+            AppSettings.photoWatchFolder(this), InputType.TYPE_CLASS_TEXT)
+
         val resetBtn = Button(this).apply {
             text = "Visszaallitas alapertekekre"
             isAllCaps = false
@@ -451,6 +617,7 @@ class MainActivity : ComponentActivity() {
                 userField.setText(AppSettings.DEF_SFTP_USER)
                 passField.setText(AppSettings.DEF_SFTP_PASS)
                 dirField.setText(AppSettings.DEF_SFTP_DIR)
+                watchFolderField.setText(AppSettings.DEF_PHOTO_WATCH_FOLDER)
             }
         }
         form.addView(resetBtn, LinearLayout.LayoutParams(
@@ -479,7 +646,8 @@ class MainActivity : ComponentActivity() {
                     cmdPrev = prevField.text.toString(),
                     cmdPlayPause = playPauseField.text.toString(),
                     cmdVolUp = volUpField.text.toString(),
-                    cmdVolDown = volDownField.text.toString()
+                    cmdVolDown = volDownField.text.toString(),
+                    photoWatchFolder = watchFolderField.text.toString()
                 )
                 Toast.makeText(this, "Beállítások mentve", Toast.LENGTH_SHORT).show()
                 notifyServiceSettingsChanged()
@@ -490,14 +658,25 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun notifyServiceSettingsChanged() {
-        // a WebSocket URL valtozas ervenyesitese: csak ha fut a service
-        if (!CaptureService.serviceRunning) return
-        try {
-            val i = Intent(this, CaptureService::class.java).apply {
-                action = CaptureService.ACTION_RECONNECT_WS
+        // a WebSocket URL valtozas ervenyesitese a CaptureService-ben: csak ha fut
+        if (CaptureService.serviceRunning) {
+            try {
+                val i = Intent(this, CaptureService::class.java).apply {
+                    action = CaptureService.ACTION_RECONNECT_WS
+                }
+                startService(i)
+            } catch (_: Exception) {
             }
-            startService(i)
-        } catch (_: Exception) {
+        }
+        // ugyanez a beepitett kamera figyelo szolgaltatasnak (uj WS URL / mappa)
+        if (PhotoWatchService.running) {
+            try {
+                val i = Intent(this, PhotoWatchService::class.java).apply {
+                    action = PhotoWatchService.ACTION_RELOAD
+                }
+                startService(i)
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -608,6 +787,14 @@ class MainActivity : ComponentActivity() {
         }
         background = rippleBg(content, Color.parseColor("#66FFFFFF"))
         setPadding(dp(16), dp(12), dp(16), dp(12))
+    }
+
+    // egy meglevo (filledButton-nal keszult) gomb hatterszinenek atallitasa
+    private fun setButtonColor(btn: Button, color: Int) {
+        val content = GradientDrawable().apply {
+            setColor(color); cornerRadius = dp(12).toFloat()
+        }
+        btn.background = rippleBg(content, Color.parseColor("#66FFFFFF"))
     }
 
     private fun field(parent: LinearLayout, label: String, value: String, type: Int): EditText {
