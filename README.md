@@ -1,157 +1,137 @@
 # WS REMCON – natív Android app (root NEM kell)
 
-Kikapcsolt kijelzőnél WebSocket üzenetre fotót készít a telefonba OTG-vel dugott
-USB (UVC) webkameráról, és a telefonra menti.
+**v3.0**
 
-> Root nélkül, Androidon ez az EGYETLEN stabil út a USB kamerához: a kamerát az
-> Android USB Host API éri el (az AUSBC könyvtáron keresztül). Az egyetlen
-> hardveres feltétel, hogy a telefonod támogassa az **OTG / USB host** módot
-> (a legtöbb támogatja).
+WebSocket-vezérelt háttér-app Androidra, ami több feladatot lát el egyszerre,
+kikapcsolt kijelzőnél is:
+
+1. **USB (UVC) kamera → fotó + SFTP** – OTG-vel dugott külső webkameráról
+   WebSocket-üzenetre fotót készít, elmenti a telefonra (DCIM), és feltölti SFTP-vel.
+2. **Beépített kamera → SFTP** *(új, külön ki/be kapcsolható)* – figyeli a telefon
+   beépített kamerájával készült új fotókat, és azonnal feltölti őket SFTP-vel,
+   majd `uploaded` WebSocket-üzenetet küld.
+3. **Média- és hangerővezérlés** – ugyanazon a WebSocket kapcsolaton
+   rendszer-médiabillentyűket / hangerő-parancsokat ad ki.
+
+> Root nélkül, Androidon ez az EGYETLEN stabil út a külső USB kamerához: a
+> kamerát az Android USB Host API éri el (az AUSBC/UVC könyvtáron keresztül).
+> Az egyetlen hardveres feltétel az **OTG / USB host** támogatás (a legtöbb
+> telefon támogatja). A beépített kamera figyeléséhez nem kell OTG.
+
+---
+
+## Fő képernyő (füstüveg / sötét téma)
+
+A felület sötét „füstüveg" stílusú, idővonalas állapot-nézettel:
+
+- **Állapot & események** (idővonal): Szolgáltatás · WebSocket (+ URL) · Kamera.
+- **Üzemmód**: az aktuális mód (Audio / Remote Controller) és a **Váltás** gomb.
+- **Beépített kamera → SFTP**: a figyelés állapota, a mappa / feltöltve / utolsó
+  fájl / utolsó esemény, és a **Bekapcsolás / Kikapcsolás** gomb.
+- **Vezérlés**: mentés helye, SFTP, parancsok, készült képek, média események,
+  utolsó esemény – alattuk a **Beállítások / Szolgáltatás indítása / leállítása**.
+
+A működés logikája megegyezik a korábbi verziókkal – ez a kiadás a kinézetet
+frissítette (füstüveg + idővonal) és felemelte a verziót 3.0-ra.
+
+---
+
+## Fájlok
+
+M�sold be őket, felülírva a generáltakat:
+
+- `MainActivity.kt`, `CaptureService.kt`, `PhotoWatchService.kt`, `AppSettings.kt`
+  → `app/src/main/java/com/example/usbcapture/`
+- `AndroidManifest.xml` → `app/src/main/`
+- `device_filter.xml` → `app/src/main/res/xml/`
+- `app/build.gradle`, `settings.gradle` → cseréld a meglévőket
+
+---
 
 ## Beállítás Android Studio-ban
 
 1. **New Project → Empty Views Activity**, nyelv: **Kotlin**, csomagnév:
    `com.example.usbcapture`.
-2. Másold be a fájlokat, felülírva a generáltakat:
-   - `MainActivity.kt`, `CaptureService.kt` → `app/src/main/java/com/example/usbcapture/`
-   - `AndroidManifest.xml` → `app/src/main/`
-   - `device_filter.xml` → `app/src/main/res/xml/`
-   - `app/build.gradle` és `settings.gradle` → cseréld a meglévőket
-3. `CaptureService.kt` tetején írd be a `WS_URL`-t (a saját WebSocket címed).
-4. **Sync Now**, majd **Run** ▶ a telefonodra.
+2. Másold be a fenti fájlokat.
+3. **Sync Now**, majd **Run** ▶ a telefonodra. (A projekt GitHub Actions-szel is
+   fordítható; a kész APK-t kézzel sideloadolod.)
+
+Beépített könyvtárak (lásd `app/build.gradle`):
+`okhttp` (WebSocket), `com.herohan:UVCAndroid` (USB/UVC kamera),
+`com.github.mwiede:jsch` (SFTP/SSH).
+
+---
 
 ## Első indítás – engedélyek
 
-- Kamera + Értesítés engedély → *Engedélyezés*.
-- Akkumulátor-optimalizálás → ne korlátozza az appot.
+- **Kamera** + **Értesítés** engedély → *Engedélyezés*.
+- **Akkumulátor-optimalizálás** → ne korlátozza az appot (az app maga kéri).
 - USB kamera bedugásakor a rendszer rákérdez az eszköz-hozzáférésre → pipáld be
   a *„mindig ehhez az alkalmazáshoz"* opciót.
-
-A fotók ide kerülnek: `Android/data/com.example.usbcapture/files/Pictures/`
-
-## Media (zene) vezérlés – beépítve
-
-Az app a kamera-trigger mellett **médialejátszót is vezérel** ugyanazon a
-WebSocket kapcsolaton. Amikor a szerver az alábbi szöveges üzeneteket küldi,
-az app rendszer-médiabillentyűt ad ki (VLC és bármely médialejátszó reagál rá,
-ami kezeli a médiabillentyűket):
-
-- `next` → következő szám (`KEYCODE_MEDIA_NEXT`)
-- `prev` → előző szám (`KEYCODE_MEDIA_PREVIOUS`)
-- `pause` → lejátszás / szünet (`KEYCODE_MEDIA_PLAY_PAUSE`)
-
-A három parancsszöveg a **Beállítások → MEDIA VEZERLES** alatt szabadon
-átírható (a fenti értékek az alapértelmezések). A kamera triggere (`takeapicture`)
-és ezek a parancsok külön üzenetek, így nem ütköznek – egy app látja el mindkét
-szerepet (`mode0` = Remote Controller / kamera, `mode1` = Audio Controller / zene).
-Az alkalmazás bármelyik szerver-módban a beérkező üzenetnek megfelelően reagál,
-a „Mod valtasa" gomb pedig a szerver módját kapcsolja (`setmode0` / `setmode1`).
-
-> A médiabillentyűk küldéséhez nem kell külön engedély. A háttérben futáshoz itt
-> is érdemes kikapcsolni az akku-optimalizálást (lásd lentebb).
-
-## Tesztelés
-
-Küldj bármilyen WebSocket üzenetet → minden üzenet egy fotót vált ki.
-A `Logcat`-ben (`CaptureService` tag) követheted, mi történik.
+- A **beépített kamera figyeléséhez** külön kép-olvasási engedély kell
+  (Android 13+: *fotók*, régebbin *tárhely*). Ezt az app csak akkor kéri el,
+  amikor a funkciót bekapcsolod – így opcionális marad.
 
 ---
 
-## Hogyan működik a fotózás (a megbízható rész)
+## WebSocket parancsok
 
-Nem a `captureImage` hívást használjuk (az preview felületre várhat), hanem a
-`setRawPreviewData(true)` + `addPreviewDataCallBack` párost: a kamera nyers NV21
-képkockáit kapjuk meg, és amikor üzenet jön, a következő képkockát JPEG-be mentjük
-(`YuvImage`). Ehhez nem kell látható kamerakép, ezért működik háttérben,
-kikapcsolt kijelzővel.
+A szerver szöveges üzenetei:
 
-## Ha nem készül fotó – hibakeresés (Logcat)
+| Üzenet | Hatás |
+| --- | --- |
+| `takeapicture` | fotó a **külső USB (UVC)** kameráról → mentés + SFTP feltöltés → `uploaded` |
+| `next` | következő szám (`KEYCODE_MEDIA_NEXT`) |
+| `prev` | előző szám (`KEYCODE_MEDIA_PREVIOUS`) |
+| `pause` | lejátszás / szünet (`KEYCODE_MEDIA_PLAY_PAUSE`) |
+| `hangerofel` | hangerő fel |
+| `hangerole` | hangerő le |
+| `setmode0` / `setmode1` | szerver mód váltása (Remote / Audio Controller) |
 
-- **„could not negotiate with camera" / „unsupported preview size"**: a kamerád
-  nem tudja az 1280x720-at. A kód `onCameraState` → `OPENED` ágban már lekéri a
-  támogatott méreteket (`getAllPreviewSizes`) és a legnagyobbra vált – de ha az
-  induló kérés elbukik, állítsd a `DEFAULT_W`/`DEFAULT_H`-t pl. 640x480-ra.
-- **Mentési hiba „nem NV21 a formátum"**: néhány kamera más formátumot ad. Ekkor a
-  `CameraRequest.Builder()`-be vedd fel:
-  `.setPreviewFormat(CameraRequest.PreviewFormat.FORMAT_MJPEG)` és/vagy igazítsd a
-  mentést a kapott `format`-hoz.
-- **Fordítási hiba az `onPreviewData`-nál**: verziótól függően a szignatúra lehet
-  `onPreviewData(data, width, height, format)` is. Ekkor használd a callbackből
-  kapott `width`/`height`-ot a `frameW`/`frameH` helyett.
-- Ground truth a pontos API-hoz a hivatalos demo:
-  https://github.com/jiangdongguo/AndroidUSBCamera
-
-## Gyártói korlátozások (fontos a stabil háttérfutáshoz)
-
-Sok ROM (Xiaomi/MIUI, Samsung, Oppo, Huawei) agresszíven leállítja a háttér-appokat.
-Telefon beállításaiban Termux… ill. itt az appnál kapcsold be az
-**„Autostart" / korlátlan háttérfutás** engedélyt, és vedd ki az akku-optimalizálásból.
-
-## Galériába mentés (opcionális)
-
-Most az app-saját mappába ment (nem kell tárhely-engedély). Ha a Galériában is
-látni akarod, a `saveNv21AsJpeg` után tedd be a fájlt a `MediaStore`-ba – szólj,
-és megírom.
+A parancsszövegek a **Beállítások**ban szabadon átírhatók (a fentiek az
+alapértékek). A `mode0` = Remote Controller (kamera), `mode1` = Audio Controller
+(zene). A **beépített kamera figyelő** ettől függetlenül, saját WebSocket
+kapcsolaton küldi az `uploaded` üzenetet a saját feltöltései után.
 
 ---
 
-## Fordítás Android Studio NÉLKÜL (GitHub Actions, ingyen)
+## Beállítások
 
-Nem kell semmit telepítened a gépedre. A felhőben fordul le, és letöltöd a kész APK-t.
+Egy ablakban, szekciókra bontva:
 
-1. Készíts egy ingyenes **GitHub** fiókot, majd egy **új repository**-t.
-2. Töltsd fel ennek a projektnek a teljes tartalmát a repóba, a **mappaszerkezetet
-   megtartva** (a legegyszerűbb a mellékelt ZIP kicsomagolása, majd a fájlok feltöltése,
-   vagy `git push`). Fontos, hogy meglegyen a `.github/workflows/build.yml` is.
-3. A feltöltés (push a `main` ágra) automatikusan elindítja a fordítást.
-   A repó felső menüjében az **Actions** fülön látod a futást.
-4. Ha kész (zöld pipa), kattints a futásra, és lent a **Artifacts** résznél töltsd le az
-   **app-debug-apk** fájlt. Ez egy zip, benne az `app-debug.apk`.
-5. Másold a telefonodra, és telepítsd (engedélyezd az „ismeretlen forrásból
-   telepítést"). Ez egy debug APK, közvetlenül telepíthető.
+- **Általános**: WebSocket URL, fényképek mappa (a DCIM-en belül, külső kamera).
+- **Média vezérlés**: következő / előző / lejátszás-szünet parancs.
+- **Hangerő vezérlés**: hangerő fel / le parancs.
+- **SFTP / SSH**: be/ki kapcsoló, host, port, felhasználó, jelszó, távoli mappa.
+- **Beépített kamera → SFTP**: figyelt mappa (a DCIM-en belül, alapból `Camera`).
 
-Ha módosítasz valamit (pl. a `WS_URL`-t), elég újra feltölteni a fájlt – újrafordul.
-
-### Egyéb felhős lehetőségek
-- **GitHub Codespaces** vagy **Gitpod**: teljes felhős fejlesztőkörnyezet a böngészőben,
-  ahol szintén futtathatod a `gradle assembleDebug`-ot.
-- **Telefonos fordítók (pl. AIDE):** ezt NEM ajánlom ehhez, mert az AUSBC natív
-  könyvtárakat (.so) tartalmaz, amit az on-device fordítók általában nem kezelnek jól.
+A „Visszaállítás alapértékekre" minden mezőt visszaállít.
 
 ---
 
-## SFTP (SSH) feltöltés – a kész kép azonnali feltöltése
+## Beépített kamera → SFTP (részletek)
 
-A `CaptureService.kt` config blokkjában kapcsolható és állítható:
+- Külön, önálló előtér-szolgáltatás (`PhotoWatchService`), a külső-kamerás
+  résztől teljesen függetlenül, saját ki/be kapcsolóval és saját WebSocket
+  kapcsolattal. Bármelyik futhat a másik nélkül.
+- A MediaStore-t figyeli: amint a beépített kamera új képet ment a figyelt
+  mappába (alapból `DCIM/Camera`), az eredeti fájlt SFTP-vel feltölti a beállított
+  szerverre, majd sikeres feltöltéskor `uploaded` üzenetet küld.
+- Csak kész (nem „pending") képeket tölt fel; sorozatfotókat egymás után.
+- Az SFTP-beállításokat a közös beállításokból veszi (ugyanaz, mint a külső
+  kameránál), de külön kapcsolatot kezel.
 
-```kotlin
-private const val SFTP_ENABLED = true                      // kapcsold true-ra
-private const val SFTP_HOST = "192.168.1.10"               // szerver címe
-private const val SFTP_PORT = 22                           // port (alap: 22)
-private const val SFTP_USER = "felhasznalo"
-private const val SFTP_PASSWORD = "jelszo"
-private const val SFTP_REMOTE_DIR = "/home/felhasznalo/kamera"  // célmappa
-```
+**Megjegyzések:** telefon-újraindítás után a figyelés nem indul el magától, csak
+az app következő megnyitásakor (kérésre hozzáadható `BOOT_COMPLETED` figyelő).
+Android 14+ alatt a `dataSync` típusú előtér-szolgáltatásnak van egy hosszú napi
+össz-időkorlátja, ami nagyon hosszú, folyamatos futásnál számíthat; alkalmankénti
+fotózásnál nem.
 
-Hogyan működik: a fotó elkészülte után a kép helyben is mentődik (DCIM/DCIM2),
-és ezzel egyidőben egy külön háttérszálon felmegy SFTP-n a megadott mappába
-(amit létrehoz, ha még nincs). A feltöltések sorban futnak, így nem blokkolják
-a kamerát. Ha a feltöltés hibázik (pl. nincs net), a Logcatben `SFTP hiba`
-látszik, de a helyi mentés akkor is megvan.
+---
 
-### Biztonsági megjegyzések (őszintén)
-- A jelszó a forráskódban szerepel – a saját, privát használatodhoz ez rendben
-  lehet, de ha a repó publikus a GitHubon, **mindenki látja**. Tartsd a repót
-  privátként, vagy használj jelszó helyett SSH-kulcsot.
-- A kód `StrictHostKeyChecking = no`-val fut, ami egyszerű, de elvileg sebezhető
-  „man-in-the-middle" támadásra. Megbízható hálózaton (pl. saját szerver) ez
-  általában elfogadható; nagyobb biztonsághoz a szerver kulcsát known_hosts-ba
-  kellene tenni.
+## Változások – v3.0
 
-### SSH-kulcsos belépés (jelszó helyett, opcionális)
-Ha kulccsal szeretnél belépni, a `jsch.getSession(...)` előtt:
-```kotlin
-jsch.addIdentity("/data/data/com.example.usbcapture/files/id_rsa")
-```
-és hagyd ki a `session.setPassword(...)` sort. A privát kulcsot előbb az app
-elérhető helyére kell másolni. Szólj, ha ezt is bekészítsem.
+- Teljesen új, sötét **füstüveg** felület, **idővonalas** állapot-nézettel.
+- A **beépített kamera → SFTP** figyelő funkció (külön kapcsolóval).
+- Beállítások ablak az új stílusban, minden mezővel.
+- Verzió: `versionName 3.0` (`versionCode 3`).
