@@ -92,6 +92,12 @@ class MainActivity : ComponentActivity() {
     private lateinit var pwInfo: TextView
     private lateinit var pwToggleBtn: Button
 
+    // parancsra foto (hatso kamera) kartya elemei
+    private lateinit var snapDot: View
+    private lateinit var snapValue: TextView
+    private lateinit var snapInfo: TextView
+    private lateinit var snapToggleBtn: Button
+
     // az app aktualis verzioneve (a build.gradle versionName-mel osszhangban)
     private val appVersionName = "3.0"
 
@@ -125,6 +131,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // a parancsra-fotohoz a CAMERA engedely kell - ezt is a kapcsolo
+    // bekapcsolasakor kerjuk el, ha meg nincs meg
+    private val snapPermLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        if (result.values.all { it }) {
+            enableSnap()
+        } else {
+            Toast.makeText(
+                this,
+                "Engedély nélkül nem indítható a parancsra fotó",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(buildUi())
@@ -145,6 +167,11 @@ class MainActivity : ComponentActivity() {
         // a kepek olvasasi engedelye, akkor inditsuk ujra automatikusan
         if (AppSettings.photoWatchEnabled(this) && hasPhotoReadPermission()) {
             startPhotoWatchService()
+        }
+
+        // ugyanez a parancsra-fotora (ha be volt kapcsolva es van kamera engedely)
+        if (AppSettings.snapEnabled(this) && hasCameraPermission()) {
+            startSnapService()
         }
     }
 
@@ -274,6 +301,36 @@ class MainActivity : ComponentActivity() {
 
         root.addView(pwCard, lp(bottom = dp(13)))
 
+        // --- PARANCSRA FOTO (hatso kamera) -> SFTP ---
+        val snapCard = cardView()
+        snapCard.addView(sectionTitle("PARANCSRA FOTÓ → SFTP"))
+
+        val snapRow = rowView()
+        snapDot = dotView()
+        snapRow.addView(snapDot, dotLp())
+        val snapCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        snapCol.addView(TextView(this).apply {
+            text = "Hátsó kamera"; setTextColor(cText); textSize = 15f
+            setTypeface(typeface, Typeface.BOLD)
+        })
+        snapValue = valueText()
+        snapCol.addView(snapValue)
+        snapRow.addView(snapCol)
+        snapCard.addView(snapRow, lp(top = dp(6)))
+
+        snapInfo = TextView(this).apply {
+            textSize = 12f; setTextColor(cText)
+            setTypeface(Typeface.MONOSPACE, Typeface.NORMAL)
+            setLineSpacing(dp(5).toFloat(), 1f)
+        }
+        snapCard.addView(boxWrap(snapInfo), lp(top = dp(12)))
+
+        snapToggleBtn = primaryButton("Bekapcsolás")
+        snapToggleBtn.setOnClickListener { toggleSnap() }
+        snapCard.addView(snapToggleBtn, lp(top = dp(12)))
+
+        root.addView(snapCard, lp(bottom = dp(13)))
+
         // --- VEZERLES ---
         val controlCard = cardView()
         controlCard.addView(sectionTitle("VEZÉRLÉS"))
@@ -362,6 +419,7 @@ class MainActivity : ComponentActivity() {
 
         refreshModeUi(ws)
         refreshPhotoWatchUi()
+        refreshSnapUi()
     }
 
     // -------------------------- Uzemmod --------------------------
@@ -526,6 +584,87 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
 
+    // -------------------------- Parancsra foto (hatso kamera) --------------------------
+
+    private fun refreshSnapUi() {
+        val enabled = AppSettings.snapEnabled(this)
+        val running = SnapService.running
+        val wsOk = SnapService.wsConnected
+
+        val dotColor = when {
+            running -> cGreen
+            enabled -> cRed       // be van kapcsolva, de valamiert nem fut
+            else -> cGray
+        }
+        snapDot.background = dotDrawable(dotColor)
+
+        snapValue.text = when {
+            running && wsOk -> "FUT · WS kapcsolódva"
+            running -> "FUT · WS nincs"
+            enabled -> "BE (nem fut)"
+            else -> "KIKAPCSOLVA"
+        }
+        snapValue.setTextColor(if (running) cGreen else if (enabled) cRed else cTextSub)
+
+        val sb = StringBuilder()
+        sb.append("Parancs:  ").append(AppSettings.snapCommand(this)).append("\n")
+        sb.append("Kamera:  hátsó · vaku ki · autofókusz\n")
+        sb.append("Készített:  ").append(SnapService.captureCount).append("\n")
+        sb.append("Utolsó fájl:  ").append(SnapService.lastFile).append("\n")
+        sb.append("Utolsó esemény:  ").append(SnapService.lastEvent)
+        snapInfo.text = sb.toString()
+
+        if (running) {
+            snapToggleBtn.text = "Kikapcsolás"
+            styleDanger(snapToggleBtn)
+        } else {
+            snapToggleBtn.text = "Bekapcsolás"
+            stylePrimary(snapToggleBtn)
+        }
+    }
+
+    private fun toggleSnap() {
+        if (SnapService.running) {
+            disableSnap()
+        } else {
+            if (hasCameraPermission()) {
+                enableSnap()
+            } else {
+                snapPermLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+            }
+        }
+    }
+
+    private fun enableSnap() {
+        AppSettings.setSnapEnabled(this, true)
+        startSnapService()
+        Toast.makeText(this, "Parancsra fotó bekapcsolva", Toast.LENGTH_SHORT).show()
+        handler.postDelayed({ refreshStatus() }, 400)
+    }
+
+    private fun disableSnap() {
+        AppSettings.setSnapEnabled(this, false)
+        stopSnapService()
+        // azonnali visszajelzes; a service onDestroy ugyanezt beallitja
+        SnapService.running = false
+        SnapService.wsConnected = false
+        Toast.makeText(this, "Parancsra fotó kikapcsolva", Toast.LENGTH_SHORT).show()
+        refreshStatus()
+    }
+
+    private fun startSnapService() {
+        val i = Intent(this, SnapService::class.java)
+        ContextCompat.startForegroundService(this, i)
+    }
+
+    private fun stopSnapService() {
+        stopService(Intent(this, SnapService::class.java))
+    }
+
+    private fun hasCameraPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+
     // -------------------------- Beallitasok --------------------------
 
     private fun showSettingsDialog() {
@@ -604,6 +743,11 @@ class MainActivity : ComponentActivity() {
         val watchFolderField = field(form, "Figyelt mappa (a DCIM-en belül)",
             AppSettings.photoWatchFolder(this), InputType.TYPE_CLASS_TEXT)
 
+        form.addView(sectionAccent("PARANCSRA FOTÓ (hátsó kamera)"))
+
+        val snapCommandField = field(form, "Parancs (WebSocket üzenet)",
+            AppSettings.snapCommand(this), InputType.TYPE_CLASS_TEXT)
+
         val resetBtn = ghostButton("Visszaállítás alapértékekre").apply {
             setOnClickListener {
                 wsField.setText(AppSettings.DEF_WS_URL)
@@ -620,6 +764,7 @@ class MainActivity : ComponentActivity() {
                 passField.setText(AppSettings.DEF_SFTP_PASS)
                 dirField.setText(AppSettings.DEF_SFTP_DIR)
                 watchFolderField.setText(AppSettings.DEF_PHOTO_WATCH_FOLDER)
+                snapCommandField.setText(AppSettings.DEF_SNAP_COMMAND)
             }
         }
         form.addView(resetBtn, LinearLayout.LayoutParams(
@@ -668,7 +813,8 @@ class MainActivity : ComponentActivity() {
                 cmdPlayPause = playPauseField.text.toString(),
                 cmdVolUp = volUpField.text.toString(),
                 cmdVolDown = volDownField.text.toString(),
-                photoWatchFolder = watchFolderField.text.toString()
+                photoWatchFolder = watchFolderField.text.toString(),
+                snapCommand = snapCommandField.text.toString()
             )
             Toast.makeText(this, "Beállítások mentve", Toast.LENGTH_SHORT).show()
             notifyServiceSettingsChanged()
@@ -695,6 +841,16 @@ class MainActivity : ComponentActivity() {
             try {
                 val i = Intent(this, PhotoWatchService::class.java).apply {
                     action = PhotoWatchService.ACTION_RELOAD
+                }
+                startService(i)
+            } catch (_: Exception) {
+            }
+        }
+        // es a parancsra-foto szolgaltatasnak (uj WS URL / parancs)
+        if (SnapService.running) {
+            try {
+                val i = Intent(this, SnapService::class.java).apply {
+                    action = SnapService.ACTION_RELOAD
                 }
                 startService(i)
             } catch (_: Exception) {
