@@ -143,6 +143,8 @@ fotózásnál nem.
 - WebSocketen a `photo` parancsra (a Beállításokban átírható) a **hátsó**
   kamerával készít egy képet – soha nem az előlapival –, majd elmenti
   (DCIM/&lt;mappa&gt;) és feltölti SFTP-vel, végül `uploaded` üzenetet küld.
+- A kép **mindig a lehető legnagyobb** (a hátsó kamera által kínált) JPEG
+  felbontással készül – ezt automatikusan választja ki, plafon nélkül.
 - **Vaku soha nem villan** (az expozíció `CONTROL_AE_MODE_ON`, a vaku explicit
   `FLASH_MODE_OFF`), és a kép előtt **mindig lefut az autofókusz** (ha nem áll be
   időben, egy rövid időkorlát után akkor is elkészül a kép).
