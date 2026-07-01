@@ -609,6 +609,7 @@ class MainActivity : ComponentActivity() {
         val sb = StringBuilder()
         sb.append("Parancs:  ").append(AppSettings.snapCommand(this)).append("\n")
         sb.append("Kamera:  hátsó · vaku ki · autofókusz\n")
+        sb.append("Felbontás:  ").append(SnapService.lastResolution).append(" (max)\n")
         sb.append("Készített:  ").append(SnapService.captureCount).append("\n")
         sb.append("Utolsó fájl:  ").append(SnapService.lastFile).append("\n")
         sb.append("Utolsó esemény:  ").append(SnapService.lastEvent)
