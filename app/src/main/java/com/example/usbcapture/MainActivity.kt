@@ -531,17 +531,39 @@ class MainActivity : ComponentActivity() {
     private fun showSettingsDialog() {
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(8), dp(20), dp(8))
+            setPadding(dp(20), dp(16), dp(20), dp(8))
             setBackgroundColor(cBg)
         }
+
+        // sajat fejlec (cim + bezaro X) a default szurke cimsav helyett
+        val xBtn = TextView(this).apply {
+            text = "✕"; textSize = 15f; gravity = Gravity.CENTER
+            setTextColor(cTextSub)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(cBox); setStroke(dp(1), cBorder)
+            }
+        }
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(4))
+        }
+        headerRow.addView(TextView(this).apply {
+            text = "Beállítások"; textSize = 20f; setTextColor(cText)
+            setTypeface(typeface, Typeface.BOLD)
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT).apply { weight = 1f })
+        headerRow.addView(xBtn, LinearLayout.LayoutParams(dp(32), dp(32)))
+        form.addView(headerRow)
+
+        form.addView(sectionAccent("ÁLTALÁNOS"))
 
         val wsField = field(form, "WebSocket URL", AppSettings.wsUrl(this),
             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
         val albumField = field(form, "Fényképek mappa (a DCIM-en belül)",
             AppSettings.album(this), InputType.TYPE_CLASS_TEXT)
 
-        form.addView(sectionTitle("MÉDIA VEZÉRLÉS (zenelejátszó)")
-            .apply { setPadding(0, dp(20), 0, dp(2)) })
+        form.addView(sectionAccent("MÉDIA VEZÉRLÉS (zenelejátszó)"))
 
         val nextField = field(form, "Következő szám parancs",
             AppSettings.cmdNext(this), InputType.TYPE_CLASS_TEXT)
@@ -550,15 +572,14 @@ class MainActivity : ComponentActivity() {
         val playPauseField = field(form, "Lejátszás / szünet parancs",
             AppSettings.cmdPlayPause(this), InputType.TYPE_CLASS_TEXT)
 
-        form.addView(sectionTitle("HANGERŐ VEZÉRLÉS")
-            .apply { setPadding(0, dp(20), 0, dp(2)) })
+        form.addView(sectionAccent("HANGERŐ VEZÉRLÉS"))
 
         val volUpField = field(form, "Hangerő fel parancs",
             AppSettings.cmdVolUp(this), InputType.TYPE_CLASS_TEXT)
         val volDownField = field(form, "Hangerő le parancs",
             AppSettings.cmdVolDown(this), InputType.TYPE_CLASS_TEXT)
 
-        form.addView(sectionTitle("SFTP / SSH").apply { setPadding(0, dp(20), 0, dp(2)) })
+        form.addView(sectionAccent("SFTP / SSH"))
 
         val sftpCheck = CheckBox(this).apply {
             text = "SFTP feltöltés bekapcsolva"
@@ -578,8 +599,7 @@ class MainActivity : ComponentActivity() {
         val dirField = field(form, "SFTP távoli mappa", AppSettings.sftpDir(this),
             InputType.TYPE_CLASS_TEXT)
 
-        form.addView(sectionTitle("BEÉPÍTETT KAMERA → SFTP")
-            .apply { setPadding(0, dp(20), 0, dp(2)) })
+        form.addView(sectionAccent("BEÉPÍTETT KAMERA → SFTP"))
 
         val watchFolderField = field(form, "Figyelt mappa (a DCIM-en belül)",
             AppSettings.photoWatchFolder(this), InputType.TYPE_CLASS_TEXT)
@@ -625,10 +645,10 @@ class MainActivity : ComponentActivity() {
         }
 
         val dialog = AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("Beállítások")
             .setView(scroll)
             .create()
 
+        xBtn.setOnClickListener { dialog.dismiss() }
         cancelBtn.setOnClickListener { dialog.dismiss() }
         saveBtn.setOnClickListener {
             val port = portField.text.toString().trim().toIntOrNull()
@@ -763,6 +783,26 @@ class MainActivity : ComponentActivity() {
         text = t; textSize = 11f; setTextColor(cTextSub)
         setTypeface(typeface, Typeface.BOLD)
         letterSpacing = 0.08f
+    }
+
+    // szekciofejlec a beallitasokban: akcent szin + kis akcent sav, hogy
+    // latvanyosan elkuloniiljon, mi mihez tartozik
+    private fun sectionAccent(t: String): LinearLayout {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(20), 0, dp(4))
+        }
+        row.addView(View(this).apply {
+            background = GradientDrawable().apply {
+                setColor(cAccent); cornerRadius = dp(2).toFloat()
+            }
+        }, LinearLayout.LayoutParams(dp(3), dp(14)).apply { rightMargin = dp(9) })
+        row.addView(TextView(this).apply {
+            text = t; textSize = 12f; setTextColor(cAccent)
+            setTypeface(typeface, Typeface.BOLD); letterSpacing = 0.06f
+        })
+        return row
     }
 
     private fun rowView(): LinearLayout = LinearLayout(this).apply {
