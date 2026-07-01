@@ -38,6 +38,10 @@ object AppSettings {
     private const val K_PHOTO_WATCH_ENABLED = "photo_watch_enabled"
     private const val K_PHOTO_WATCH_FOLDER = "photo_watch_folder"
 
+    // parancsra foto a hatso kameraval (kulon ki/be kapcsolhato szolgaltatas)
+    private const val K_SNAP_ENABLED = "snap_enabled"
+    private const val K_SNAP_COMMAND = "snap_command"
+
     // ===================== ALAP BEALLITASOK =====================
     const val DEF_WS_URL = "wss://socket.levstack.hu/sound"
     const val DEF_ALBUM = "DCIM2"
@@ -63,6 +67,11 @@ object AppSettings {
     // a figyelt mappa a DCIM-en belul (a legtobb telefonon "Camera")
     const val DEF_PHOTO_WATCH_ENABLED = false
     const val DEF_PHOTO_WATCH_FOLDER = "Camera"
+
+    // parancsra foto alapertekei: alapbol KIKAPCSOLVA (a fo kepernyon kapcsolhato);
+    // a parancs alapertelmezve "photo"
+    const val DEF_SNAP_ENABLED = false
+    const val DEF_SNAP_COMMAND = "photo"
     // ============================================================
 
     private fun prefs(ctx: Context) =
@@ -122,6 +131,21 @@ object AppSettings {
         prefs(ctx).edit().putBoolean(K_PHOTO_WATCH_ENABLED, enabled).apply()
     }
 
+    fun snapEnabled(ctx: Context): Boolean =
+        prefs(ctx).getBoolean(K_SNAP_ENABLED, DEF_SNAP_ENABLED)
+
+    fun snapCommand(ctx: Context): String =
+        prefs(ctx).getString(K_SNAP_COMMAND, DEF_SNAP_COMMAND) ?: DEF_SNAP_COMMAND
+
+    /**
+     * A parancsra-foto ki/be kapcsolasa is kulon, sajat metoduson keresztul
+     * tarolodik (a fo kepernyo kapcsoloja allitja), igy a Beallitasok mentese
+     * (save) NEM irja felul ezt az allapotot.
+     */
+    fun setSnapEnabled(ctx: Context, enabled: Boolean) {
+        prefs(ctx).edit().putBoolean(K_SNAP_ENABLED, enabled).apply()
+    }
+
     fun save(
         ctx: Context,
         wsUrl: String,
@@ -137,7 +161,8 @@ object AppSettings {
         cmdPlayPause: String,
         cmdVolUp: String,
         cmdVolDown: String,
-        photoWatchFolder: String
+        photoWatchFolder: String,
+        snapCommand: String
     ) {
         prefs(ctx).edit()
             .putString(K_WS_URL, wsUrl.trim())
@@ -154,6 +179,7 @@ object AppSettings {
             .putString(K_CMD_VOLUP, cmdVolUp.trim())
             .putString(K_CMD_VOLDOWN, cmdVolDown.trim())
             .putString(K_PHOTO_WATCH_FOLDER, photoWatchFolder.trim())
+            .putString(K_SNAP_COMMAND, snapCommand.trim())
             .apply()
     }
 }
