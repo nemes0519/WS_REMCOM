@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var camDot: View
     private lateinit var camValue: TextView
     private lateinit var infoText: TextView
+    private lateinit var svcToggleBtn: Button
 
     // uzemmod kartya elemei
     private lateinit var modeBadge: TextView
@@ -185,7 +186,6 @@ class MainActivity : ComponentActivity() {
         header.addView(hCol, LinearLayout.LayoutParams(
             0, ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { weight = 1f })
-        header.addView(liveChip())
         root.addView(header, lp(bottom = dp(16)))
 
         // --- ALLAPOT & ESEMENYEK (idovonal) ---
@@ -289,13 +289,9 @@ class MainActivity : ComponentActivity() {
         settingsBtn.setOnClickListener { showSettingsDialog() }
         controlCard.addView(settingsBtn, lp(top = dp(12)))
 
-        val startBtn = primaryButton("Szolgáltatás indítása")
-        startBtn.setOnClickListener { startServiceManually() }
-        controlCard.addView(startBtn, lp(top = dp(10)))
-
-        val stopBtn = dangerButton("Szolgáltatás leállítása")
-        stopBtn.setOnClickListener { confirmStop() }
-        controlCard.addView(stopBtn, lp(top = dp(10)))
+        svcToggleBtn = primaryButton("Bekapcsolás")
+        svcToggleBtn.setOnClickListener { toggleService() }
+        controlCard.addView(svcToggleBtn, lp(top = dp(10)))
 
         root.addView(controlCard)
 
@@ -355,6 +351,14 @@ class MainActivity : ComponentActivity() {
         sb.append("Média események:  ").append(CaptureService.mediaCount).append("\n")
         sb.append("Utolsó esemény:  ").append(CaptureService.lastEvent)
         infoText.text = sb.toString()
+
+        if (running) {
+            svcToggleBtn.text = "Kikapcsolás"
+            styleDanger(svcToggleBtn)
+        } else {
+            svcToggleBtn.text = "Bekapcsolás"
+            stylePrimary(svcToggleBtn)
+        }
 
         refreshModeUi(ws)
         refreshPhotoWatchUi()
@@ -602,39 +606,57 @@ class MainActivity : ComponentActivity() {
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = dp(16) })
 
+        // dizajnos also gombsor a default dialog-gombok helyett
+        val cancelBtn = ghostButton("Mégse")
+        val saveBtn = primaryButton("Mentés")
+        val actionBar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        actionBar.addView(cancelBtn, LinearLayout.LayoutParams(
+            0, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { weight = 1f })
+        actionBar.addView(saveBtn, LinearLayout.LayoutParams(
+            0, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { weight = 1.5f; leftMargin = dp(10) })
+        form.addView(actionBar, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(18) })
+
         val scroll = ScrollView(this).apply {
             addView(form); setBackgroundColor(cBg)
         }
 
-        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+        val dialog = AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
             .setTitle("Beállítások")
             .setView(scroll)
-            .setPositiveButton("Mentés") { _, _ ->
-                val port = portField.text.toString().trim().toIntOrNull()
-                    ?: AppSettings.DEF_SFTP_PORT
-                AppSettings.save(
-                    this,
-                    wsUrl = wsField.text.toString(),
-                    album = albumField.text.toString(),
-                    sftpEnabled = sftpCheck.isChecked,
-                    sftpHost = hostField.text.toString(),
-                    sftpPort = port,
-                    sftpUser = userField.text.toString(),
-                    sftpPass = passField.text.toString(),
-                    sftpDir = dirField.text.toString(),
-                    cmdNext = nextField.text.toString(),
-                    cmdPrev = prevField.text.toString(),
-                    cmdPlayPause = playPauseField.text.toString(),
-                    cmdVolUp = volUpField.text.toString(),
-                    cmdVolDown = volDownField.text.toString(),
-                    photoWatchFolder = watchFolderField.text.toString()
-                )
-                Toast.makeText(this, "Beállítások mentve", Toast.LENGTH_SHORT).show()
-                notifyServiceSettingsChanged()
-                refreshStatus()
-            }
-            .setNegativeButton("Mégse", null)
-            .show()
+            .create()
+
+        cancelBtn.setOnClickListener { dialog.dismiss() }
+        saveBtn.setOnClickListener {
+            val port = portField.text.toString().trim().toIntOrNull()
+                ?: AppSettings.DEF_SFTP_PORT
+            AppSettings.save(
+                this,
+                wsUrl = wsField.text.toString(),
+                album = albumField.text.toString(),
+                sftpEnabled = sftpCheck.isChecked,
+                sftpHost = hostField.text.toString(),
+                sftpPort = port,
+                sftpUser = userField.text.toString(),
+                sftpPass = passField.text.toString(),
+                sftpDir = dirField.text.toString(),
+                cmdNext = nextField.text.toString(),
+                cmdPrev = prevField.text.toString(),
+                cmdPlayPause = playPauseField.text.toString(),
+                cmdVolUp = volUpField.text.toString(),
+                cmdVolDown = volDownField.text.toString(),
+                photoWatchFolder = watchFolderField.text.toString()
+            )
+            Toast.makeText(this, "Beállítások mentve", Toast.LENGTH_SHORT).show()
+            notifyServiceSettingsChanged()
+            refreshStatus()
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 
     private fun notifyServiceSettingsChanged() {
@@ -699,6 +721,15 @@ class MainActivity : ComponentActivity() {
         handler.postDelayed({ refreshStatus() }, 500)
     }
 
+    // egy gomb inditasra/leallitasra: a meglevo logikat hivja
+    private fun toggleService() {
+        if (CaptureService.serviceRunning) {
+            confirmStop()
+        } else {
+            startServiceManually()
+        }
+    }
+
     private fun requestBatteryExemption() {
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -751,26 +782,6 @@ class MainActivity : ComponentActivity() {
 
     private fun dotDrawable(color: Int): GradientDrawable = GradientDrawable().apply {
         shape = GradientDrawable.OVAL; setColor(color)
-    }
-
-    // ELO chip a fejlecben
-    private fun liveChip(): View {
-        val chip = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = GradientDrawable().apply {
-                setColor(cChip); cornerRadius = dp(999).toFloat()
-                setStroke(dp(1), cBorder)
-            }
-            setPadding(dp(11), dp(6), dp(11), dp(6))
-        }
-        chip.addView(View(this).apply { background = dotDrawable(cGreen) },
-            LinearLayout.LayoutParams(dp(7), dp(7)).apply { rightMargin = dp(6) })
-        chip.addView(TextView(this).apply {
-            text = "ÉLŐ"; setTextColor(cText); textSize = 11f
-            setTypeface(typeface, Typeface.BOLD); letterSpacing = 0.06f
-        })
-        return chip
     }
 
     // sotet "uveg" oval gyuru egy idovonal-csomoponthoz
