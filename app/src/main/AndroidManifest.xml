@@ -54,5 +54,10 @@
             android:name="com.example.usbcapture.PhotoWatchService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name="com.example.usbcapture.SnapService"
+            android:exported="false"
+            android:foregroundServiceType="camera" />
     </application>
 </manifest>
