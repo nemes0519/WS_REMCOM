@@ -29,7 +29,8 @@ A felület sötét „füstüveg" stílusú, idővonalas állapot-nézettel:
 - **Beépített kamera → SFTP**: a figyelés állapota, a mappa / feltöltve / utolsó
   fájl / utolsó esemény, és a **Bekapcsolás / Kikapcsolás** gomb.
 - **Vezérlés**: mentés helye, SFTP, parancsok, készült képek, média események,
-  utolsó esemény – alattuk a **Beállítások / Szolgáltatás indítása / leállítása**.
+  utolsó esemény – alattuk a **Beállítások** és egy **Bekapcsolás / Kikapcsolás**
+  gomb (a szolgáltatás indítása és leállítása egyetlen gombon).
 
 A működés logikája megegyezik a korábbi verziókkal – ez a kiadás a kinézetet
 frissítette (füstüveg + idővonal) és felemelte a verziót 3.0-ra.
@@ -83,7 +84,7 @@ A szerver szöveges üzenetei:
 | `takeapicture` | fotó a **külső USB (UVC)** kameráról → mentés + SFTP feltöltés → `uploaded` |
 | `next` | következő szám (`KEYCODE_MEDIA_NEXT`) |
 | `prev` | előző szám (`KEYCODE_MEDIA_PREVIOUS`) |
-| `pause` | lejátszás / szünet (`KEYCODE_MEDIA_PLAY_PAUSE`) |
+| `playpause` | lejátszás / szünet (`KEYCODE_MEDIA_PLAY_PAUSE`) |
 | `hangerofel` | hangerő fel |
 | `hangerole` | hangerő le |
 | `setmode0` / `setmode1` | szerver mód váltása (Remote / Audio Controller) |
