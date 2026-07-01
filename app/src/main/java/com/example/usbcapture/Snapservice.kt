@@ -75,8 +75,6 @@ class SnapService : Service() {
 
         // ha az autofokusz nem all be ennyi ido alatt, akkor is elkeszul a kep
         private const val AF_TIMEOUT_MS = 2500L
-        // a still JPEG felbontasat ennel nem engedjuk nagyobbra (memoria)
-        private const val MAX_STILL_PX = 12_000_000L
 
         // ---- elo allapot: ezt olvassa a MainActivity a kijelzeshez ----
         @Volatile var running = false
@@ -84,6 +82,7 @@ class SnapService : Service() {
         @Volatile var captureCount = 0
         @Volatile var lastEvent = "-"
         @Volatile var lastFile = "-"
+        @Volatile var lastResolution = "-"
     }
 
     private var webSocket: WebSocket? = null
@@ -229,6 +228,7 @@ class SnapService : Service() {
 
             val stillSize = chooseStillSize(map?.getOutputSizes(ImageFormat.JPEG))
             val previewSize = choosePreviewSize(map?.getOutputSizes(ImageFormat.YUV_420_888))
+            lastResolution = "${stillSize.width}x${stillSize.height}"
 
             stillReader = ImageReader.newInstance(
                 stillSize.width, stillSize.height, ImageFormat.JPEG, 1
@@ -385,10 +385,8 @@ class SnapService : Service() {
 
     private fun chooseStillSize(sizes: Array<Size>?): Size {
         if (sizes == null || sizes.isEmpty()) return Size(1920, 1080)
-        // a legnagyobb, de a megadott pixel-korlat alatti
-        val capped = sizes.filter { it.width.toLong() * it.height <= MAX_STILL_PX }
-        val pool = if (capped.isNotEmpty()) capped else sizes.toList()
-        return pool.maxByOrNull { it.width.toLong() * it.height } ?: sizes[0]
+        // mindig a leheto legnagyobb elerheto JPEG felbontas
+        return sizes.maxByOrNull { it.width.toLong() * it.height } ?: sizes[0]
     }
 
     private fun choosePreviewSize(sizes: Array<Size>?): Size {
