@@ -24,6 +24,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -33,32 +34,42 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 
 /**
- * Inditokepernyo + allapotkijelzo + beallitasok.
- *  - elkeri az engedelyeket es elinditja a hatterszolgaltatast
- *  - elo allapotot mutat (zold/piros pottyel a WebSocket es a Kamera)
- *  - "Beállítások": WebSocket URL, fenykep mappa, SFTP/SSH szerkesztese
- *  - "Szolgáltatás indítása" / "Szolgáltatás leállítása": kezi vezerles
+ * Inditokepernyo + allapotkijelzo + beallitasok - "fustuveg" (smoked glass)
+ * sotet temaval es idovonalas allapot-nezettel.
  *
- * Ha kesobb ujra radugsz egy USB kamerat, az app az USB_DEVICE_ATTACHED
- * miatt ujraindul es a service megint elindul - mint eddig.
+ *  - elkeri az engedelyeket es elinditja a hatterszolgaltatast
+ *  - elo allapotot mutat (idovonal: szolgaltatas / WebSocket / kamera)
+ *  - kulon "uzemmod" kartya a mod valtasahoz
+ *  - kulon "beepitett kamera -> SFTP" kartya a foto-figyeleshez
+ *  - "Beállítások": WebSocket URL, fenykep mappa, media/hangero parancsok,
+ *    SFTP/SSH es a beepitett kamera figyelt mappaja
+ *
+ * Csak a kinezet uj; a mukodes (logika) valtozatlan.
  */
 class MainActivity : ComponentActivity() {
 
-    // szinek
-    private val cGreen = Color.parseColor("#16A34A")
-    private val cRed = Color.parseColor("#DC2626")
+    // ----- szinek (fustuveg / sotet tema) -----
+    private val cBg = Color.parseColor("#0C0D10")
+    private val cCard = Color.parseColor("#14FFFFFF")
+    private val cBorder = Color.parseColor("#24FFFFFF")
+    private val cLine = Color.parseColor("#1FFFFFFF")
+    private val cText = Color.parseColor("#E8EAED")
+    private val cTextSub = Color.parseColor("#8B93A1")
+    private val cBox = Color.parseColor("#4D000000")
+    private val cChip = Color.parseColor("#14FFFFFF")
+
+    private val cAccent = Color.parseColor("#A5B4FC")
+    private val cOnAccent = Color.parseColor("#1E1B2E")
+
+    // a refreshModeUi / styleModeBadge / status hasznalja (a neveket megtartjuk)
+    private val cGreen = Color.parseColor("#6EE7B7")
+    private val cRed = Color.parseColor("#FCA5A5")
     private val cGray = Color.parseColor("#9CA3AF")
-    private val cHeader = Color.parseColor("#1F2937")
-    private val cHeaderSub = Color.parseColor("#9CA3AF")
-    private val cPageBg = Color.parseColor("#F3F4F6")
-    private val cBorder = Color.parseColor("#E5E7EB")
-    private val cTextMain = Color.parseColor("#111827")
-    private val cTextSub = Color.parseColor("#6B7280")
-    private val cBlue = Color.parseColor("#2563EB")
-    private val cPurple = Color.parseColor("#7C3AED")
-    private val cBlueSoft = Color.parseColor("#DBEAFE")
-    private val cPurpleSoft = Color.parseColor("#EDE9FE")
-    private val cGraySoft = Color.parseColor("#E5E7EB")
+    private val cBlue = Color.parseColor("#93C5FD")
+    private val cBlueSoft = Color.parseColor("#2693C5FD")
+    private val cPurple = Color.parseColor("#A5B4FC")
+    private val cPurpleSoft = Color.parseColor("#29A5B4FC")
+    private val cGraySoft = Color.parseColor("#14FFFFFF")
 
     private lateinit var svcDot: View
     private lateinit var svcValue: TextView
@@ -81,7 +92,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var pwToggleBtn: Button
 
     // az app aktualis verzioneve (a build.gradle versionName-mel osszhangban)
-    private val appVersionName = "1.1"
+    private val appVersionName = "3.0"
 
     private val handler = Handler(Looper.getMainLooper())
     private val refreshRunnable = object : Runnable {
@@ -150,132 +161,90 @@ class MainActivity : ComponentActivity() {
     // ----------------------------- UI -----------------------------
 
     private fun buildUi(): ScrollView {
-        val scroll = ScrollView(this).apply { setBackgroundColor(cPageBg) }
+        val scroll = ScrollView(this).apply { setBackgroundColor(cBg) }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(20), dp(16), dp(24))
+            setPadding(dp(16), dp(18), dp(16), dp(24))
         }
 
-        // fejlec
+        // --- fejlec (atlatszo) + ELO chip ---
         val header = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                setColor(cHeader); cornerRadius = dp(16).toFloat()
-            }
-            setPadding(dp(20), dp(18), dp(20), dp(18))
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), 0, dp(4), 0)
         }
-        header.addView(TextView(this).apply {
-            text = "WS REMCON"
-            setTextColor(Color.WHITE)
-            textSize = 20f
+        val hCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        hCol.addView(TextView(this).apply {
+            text = "WS REMCON"; setTextColor(cText); textSize = 21f
             setTypeface(typeface, Typeface.BOLD)
         })
-        header.addView(TextView(this).apply {
-            text = "Háttérben fut: WebSocket → fotó + SFTP / média vezérlés"
-            setTextColor(cHeaderSub)
-            textSize = 12f
-            setPadding(0, dp(4), 0, 0)
+        hCol.addView(TextView(this).apply {
+            text = "WebSocket · SFTP · média"; setTextColor(cTextSub); textSize = 11f
+            setPadding(0, dp(3), 0, 0)
         })
-        root.addView(header, lp(bottom = dp(14)))
+        header.addView(hCol, LinearLayout.LayoutParams(
+            0, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { weight = 1f })
+        header.addView(liveChip())
+        root.addView(header, lp(bottom = dp(16)))
 
-        // allapot kartya
+        // --- ALLAPOT & ESEMENYEK (idovonal) ---
         val statusCard = cardView()
-        statusCard.addView(sectionTitle("ÁLLAPOT"))
+        statusCard.addView(sectionTitle("ÁLLAPOT & ESEMÉNYEK"))
 
-        // Szolgaltatas sor (ugyanolyan stilus, mint a WebSocket es Kamera)
-        val svcRow = rowView()
+        val timeline = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
         svcDot = dotView()
-        svcRow.addView(svcDot, dotLp())
-        val svcCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        svcCol.addView(TextView(this).apply {
-            text = "Szolgáltatás"; setTextColor(cTextMain); textSize = 15f
-            setTypeface(typeface, Typeface.BOLD)
-        })
-        svcValue = TextView(this).apply { textSize = 14f; setTextColor(cTextSub) }
-        svcCol.addView(svcValue)
-        svcRow.addView(svcCol)
-        statusCard.addView(svcRow, lp(top = dp(6)))
+        svcValue = valueText()
+        timeline.addView(timelineNode(svcDot, "Szolgáltatás", svcValue, null, false))
 
-        // WebSocket sor
-        val wsRow = rowView()
         wsDot = dotView()
-        wsRow.addView(wsDot, dotLp())
-        val wsCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        wsCol.addView(TextView(this).apply {
-            text = "WebSocket"; setTextColor(cTextMain); textSize = 15f
-            setTypeface(typeface, Typeface.BOLD)
-        })
-        wsValue = TextView(this).apply { textSize = 14f; setTextColor(cTextSub) }
-        wsCol.addView(wsValue)
-        wsUrlText = TextView(this).apply { textSize = 11f; setTextColor(cTextSub) }
-        wsCol.addView(wsUrlText)
-        wsRow.addView(wsCol)
-        statusCard.addView(wsRow, lp(top = dp(12)))
-
-        // Kamera sor
-        val camRow = rowView()
-        camDot = dotView()
-        camRow.addView(camDot, dotLp())
-        val camCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        camCol.addView(TextView(this).apply {
-            text = "Kamera"; setTextColor(cTextMain); textSize = 15f
-            setTypeface(typeface, Typeface.BOLD)
-        })
-        camValue = TextView(this).apply { textSize = 14f; setTextColor(cTextSub) }
-        camCol.addView(camValue)
-        camRow.addView(camCol)
-        statusCard.addView(camRow, lp(top = dp(12)))
-
-        // elvalaszto
-        val divider = View(this).apply { setBackgroundColor(cBorder) }
-        statusCard.addView(divider, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(1)
-        ).apply { topMargin = dp(14); bottomMargin = dp(12) })
-
-        // info blokk
-        infoText = TextView(this).apply {
-            textSize = 13f; setTextColor(cTextMain)
-            setLineSpacing(dp(5).toFloat(), 1f)
+        wsValue = valueText()
+        wsUrlText = TextView(this).apply {
+            textSize = 11f; setTextColor(cTextSub)
+            setTypeface(Typeface.MONOSPACE, Typeface.NORMAL)
         }
-        statusCard.addView(infoText)
+        timeline.addView(timelineNode(wsDot, "WebSocket", wsValue, wsUrlText, false))
 
-        root.addView(statusCard, lp(bottom = dp(14)))
+        camDot = dotView()
+        camValue = valueText()
+        timeline.addView(timelineNode(camDot, "Kamera", camValue, null, true))
 
-        // uzemmod kartya
+        statusCard.addView(timeline, lp(top = dp(8)))
+        root.addView(statusCard, lp(bottom = dp(13)))
+
+        // --- UZEMMOD ---
         val modeCard = cardView()
         modeCard.addView(sectionTitle("ÜZEMMÓD"))
 
         modeBadge = TextView(this).apply {
-            text = "Ismeretlen"
-            textSize = 16f
+            text = "Ismeretlen"; textSize = 15f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(cTextSub)
-            gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                setColor(cGraySoft); cornerRadius = dp(24).toFloat()
+                setColor(cGraySoft); cornerRadius = dp(999).toFloat()
+                setStroke(dp(1), cBorder)
             }
-            setPadding(dp(20), dp(10), dp(20), dp(10))
+            setPadding(dp(15), dp(8), dp(15), dp(8))
         }
         modeCard.addView(modeBadge, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = dp(10); gravity = Gravity.CENTER_HORIZONTAL })
+        ).apply { topMargin = dp(8) })
 
         modeSubText = TextView(this).apply {
             text = "A mód a WebSocket csatlakozása után kérdezhető le."
-            textSize = 12f
-            setTextColor(cTextSub)
-            gravity = Gravity.CENTER
-            setPadding(0, dp(8), 0, dp(4))
+            textSize = 12f; setTextColor(cTextSub)
+            setPadding(0, dp(8), 0, 0)
         }
         modeCard.addView(modeSubText)
 
-        modeSwitchBtn = filledButton("Mód váltása", cPurple)
+        modeSwitchBtn = ghostButton("Mód váltása")
         modeSwitchBtn.setOnClickListener { switchMode() }
-        modeCard.addView(modeSwitchBtn, lp(top = dp(8)))
+        modeCard.addView(modeSwitchBtn, lp(top = dp(12)))
 
-        root.addView(modeCard, lp(bottom = dp(14)))
+        root.addView(modeCard, lp(bottom = dp(13)))
 
-        // beepitett kamera -> SFTP kartya (kulon ki/be kapcsolhato szolgaltatas)
+        // --- BEEPITETT KAMERA -> SFTP ---
         val pwCard = cardView()
         pwCard.addView(sectionTitle("BEÉPÍTETT KAMERA → SFTP"))
 
@@ -284,41 +253,47 @@ class MainActivity : ComponentActivity() {
         pwRow.addView(pwDot, dotLp())
         val pwCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         pwCol.addView(TextView(this).apply {
-            text = "Figyelés"; setTextColor(cTextMain); textSize = 15f
+            text = "Figyelés"; setTextColor(cText); textSize = 15f
             setTypeface(typeface, Typeface.BOLD)
         })
-        pwValue = TextView(this).apply { textSize = 14f; setTextColor(cTextSub) }
+        pwValue = valueText()
         pwCol.addView(pwValue)
         pwRow.addView(pwCol)
         pwCard.addView(pwRow, lp(top = dp(6)))
 
         pwInfo = TextView(this).apply {
-            textSize = 13f; setTextColor(cTextMain)
+            textSize = 12f; setTextColor(cText)
+            setTypeface(Typeface.MONOSPACE, Typeface.NORMAL)
             setLineSpacing(dp(5).toFloat(), 1f)
-            setPadding(0, dp(12), 0, 0)
         }
-        pwCard.addView(pwInfo)
+        pwCard.addView(boxWrap(pwInfo), lp(top = dp(12)))
 
-        pwToggleBtn = filledButton("Bekapcsolás", cGreen)
+        pwToggleBtn = primaryButton("Bekapcsolás")
         pwToggleBtn.setOnClickListener { togglePhotoWatch() }
         pwCard.addView(pwToggleBtn, lp(top = dp(12)))
 
-        root.addView(pwCard, lp(bottom = dp(14)))
+        root.addView(pwCard, lp(bottom = dp(13)))
 
-        // gombok
-        // vezerles kartya: a harom gomb egy helyen
+        // --- VEZERLES ---
         val controlCard = cardView()
         controlCard.addView(sectionTitle("VEZÉRLÉS"))
 
-        val settingsBtn = filledButton("Beállítások", cBlue)
-        settingsBtn.setOnClickListener { showSettingsDialog() }
-        controlCard.addView(settingsBtn, lp(top = dp(10)))
+        infoText = TextView(this).apply {
+            textSize = 12f; setTextColor(cText)
+            setTypeface(Typeface.MONOSPACE, Typeface.NORMAL)
+            setLineSpacing(dp(5).toFloat(), 1f)
+        }
+        controlCard.addView(boxWrap(infoText), lp(top = dp(10)))
 
-        val startBtn = filledButton("Szolgáltatás indítása", cGreen)
+        val settingsBtn = ghostButton("Beállítások")
+        settingsBtn.setOnClickListener { showSettingsDialog() }
+        controlCard.addView(settingsBtn, lp(top = dp(12)))
+
+        val startBtn = primaryButton("Szolgáltatás indítása")
         startBtn.setOnClickListener { startServiceManually() }
         controlCard.addView(startBtn, lp(top = dp(10)))
 
-        val stopBtn = filledButton("Szolgáltatás leállítása", cRed)
+        val stopBtn = dangerButton("Szolgáltatás leállítása")
         stopBtn.setOnClickListener { confirmStop() }
         controlCard.addView(stopBtn, lp(top = dp(10)))
 
@@ -353,10 +328,12 @@ class MainActivity : ComponentActivity() {
 
         wsDot.background = dotDrawable(if (ws) cGreen else cRed)
         wsValue.text = if (ws) "Csatlakozva" else "Nincs kapcsolat"
+        wsValue.setTextColor(if (ws) cGreen else cRed)
         wsUrlText.text = AppSettings.wsUrl(this)
 
         camDot.background = dotDrawable(if (cam) cGreen else cRed)
         camValue.text = if (cam) "Kesz - ${CaptureService.cameraInfo}" else "Nincs csatlakoztatva"
+        camValue.setTextColor(if (cam) cGreen else cRed)
 
         val sb = StringBuilder()
         sb.append("Mentés helye:  DCIM/").append(AppSettings.album(this)).append("\n")
@@ -432,7 +409,8 @@ class MainActivity : ComponentActivity() {
         modeBadge.text = label
         modeBadge.setTextColor(textColor)
         modeBadge.background = GradientDrawable().apply {
-            setColor(bgColor); cornerRadius = dp(24).toFloat()
+            setColor(bgColor); cornerRadius = dp(999).toFloat()
+            setStroke(dp(1), cBorder)
         }
     }
 
@@ -485,10 +463,10 @@ class MainActivity : ComponentActivity() {
 
         if (running) {
             pwToggleBtn.text = "Kikapcsolás"
-            setButtonColor(pwToggleBtn, cRed)
+            styleDanger(pwToggleBtn)
         } else {
             pwToggleBtn.text = "Bekapcsolás"
-            setButtonColor(pwToggleBtn, cGreen)
+            stylePrimary(pwToggleBtn)
         }
     }
 
@@ -550,6 +528,7 @@ class MainActivity : ComponentActivity() {
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), dp(8))
+            setBackgroundColor(cBg)
         }
 
         val wsField = field(form, "WebSocket URL", AppSettings.wsUrl(this),
@@ -579,6 +558,7 @@ class MainActivity : ComponentActivity() {
 
         val sftpCheck = CheckBox(this).apply {
             text = "SFTP feltöltés bekapcsolva"
+            setTextColor(cText)
             isChecked = AppSettings.sftpEnabled(this@MainActivity)
         }
         form.addView(sftpCheck)
@@ -600,9 +580,7 @@ class MainActivity : ComponentActivity() {
         val watchFolderField = field(form, "Figyelt mappa (a DCIM-en belül)",
             AppSettings.photoWatchFolder(this), InputType.TYPE_CLASS_TEXT)
 
-        val resetBtn = Button(this).apply {
-            text = "Visszaallitas alapertekekre"
-            isAllCaps = false
+        val resetBtn = ghostButton("Visszaállítás alapértékekre").apply {
             setOnClickListener {
                 wsField.setText(AppSettings.DEF_WS_URL)
                 albumField.setText(AppSettings.DEF_ALBUM)
@@ -624,9 +602,11 @@ class MainActivity : ComponentActivity() {
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = dp(16) })
 
-        val scroll = ScrollView(this).apply { addView(form) }
+        val scroll = ScrollView(this).apply {
+            addView(form); setBackgroundColor(cBg)
+        }
 
-        AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
+        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
             .setTitle("Beállítások")
             .setView(scroll)
             .setPositiveButton("Mentés") { _, _ ->
@@ -683,7 +663,7 @@ class MainActivity : ComponentActivity() {
     // -------------------------- Service vezerles --------------------------
 
     private fun confirmStop() {
-        AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
+        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
             .setTitle("Szolgáltatás leállítása")
             .setMessage(
                 "Biztosan leállítod a háttérszolgáltatást? " +
@@ -742,21 +722,26 @@ class MainActivity : ComponentActivity() {
     private fun cardView(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         background = GradientDrawable().apply {
-            setColor(Color.WHITE); cornerRadius = dp(16).toFloat()
+            setColor(cCard); cornerRadius = dp(18).toFloat()
             setStroke(dp(1), cBorder)
         }
-        setPadding(dp(18), dp(16), dp(18), dp(16))
+        setPadding(dp(16), dp(15), dp(16), dp(15))
     }
 
     private fun sectionTitle(t: String): TextView = TextView(this).apply {
-        text = t; textSize = 12f; setTextColor(cTextSub)
+        text = t; textSize = 11f; setTextColor(cTextSub)
         setTypeface(typeface, Typeface.BOLD)
-        letterSpacing = 0.06f
+        letterSpacing = 0.08f
     }
 
     private fun rowView(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
+    }
+
+    // egy allapot-ertek (a cim alatti masodlagos sor); szinet a refresh allitja
+    private fun valueText(): TextView = TextView(this).apply {
+        textSize = 13f; setTextColor(cTextSub)
     }
 
     private fun dotView(): View = View(this).apply { background = dotDrawable(cGray) }
@@ -768,42 +753,144 @@ class MainActivity : ComponentActivity() {
         shape = GradientDrawable.OVAL; setColor(color)
     }
 
+    // ELO chip a fejlecben
+    private fun liveChip(): View {
+        val chip = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                setColor(cChip); cornerRadius = dp(999).toFloat()
+                setStroke(dp(1), cBorder)
+            }
+            setPadding(dp(11), dp(6), dp(11), dp(6))
+        }
+        chip.addView(View(this).apply { background = dotDrawable(cGreen) },
+            LinearLayout.LayoutParams(dp(7), dp(7)).apply { rightMargin = dp(6) })
+        chip.addView(TextView(this).apply {
+            text = "ÉLŐ"; setTextColor(cText); textSize = 11f
+            setTypeface(typeface, Typeface.BOLD); letterSpacing = 0.06f
+        })
+        return chip
+    }
+
+    // sotet "uveg" oval gyuru egy idovonal-csomoponthoz
+    private fun ringDrawable(): GradientDrawable = GradientDrawable().apply {
+        shape = GradientDrawable.OVAL
+        setColor(Color.TRANSPARENT)
+        setStroke(dp(2), cBorder)
+    }
+
+    // egy idovonal-csomopont: bal oldalt gyuru + osszekoto vonal, jobb oldalt szoveg
+    private fun timelineNode(
+        dot: View, title: String, value: TextView, sub: TextView?, isLast: Boolean
+    ): LinearLayout {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+
+        val left = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        val circle = FrameLayout(this).apply { background = ringDrawable() }
+        circle.addView(dot, FrameLayout.LayoutParams(dp(9), dp(9), Gravity.CENTER))
+        left.addView(circle, LinearLayout.LayoutParams(dp(20), dp(20)).apply { topMargin = dp(1) })
+        if (!isLast) {
+            left.addView(View(this).apply { setBackgroundColor(cLine) },
+                LinearLayout.LayoutParams(dp(2), 0).apply { weight = 1f; topMargin = dp(2) })
+        }
+        row.addView(left, LinearLayout.LayoutParams(dp(24), ViewGroup.LayoutParams.MATCH_PARENT))
+
+        val right = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), 0, 0, if (isLast) 0 else dp(16))
+        }
+        right.addView(TextView(this).apply {
+            text = title; setTextColor(cText); textSize = 14f
+            setTypeface(typeface, Typeface.BOLD)
+        })
+        right.addView(value)
+        if (sub != null) right.addView(sub)
+        row.addView(right, LinearLayout.LayoutParams(
+            0, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { weight = 1f })
+
+        return row
+    }
+
+    // mono info-doboz koré sotet, lekerekitett hatter
+    private fun boxWrap(inner: View): LinearLayout {
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                setColor(cBox); cornerRadius = dp(12).toFloat()
+            }
+            setPadding(dp(13), dp(11), dp(13), dp(11))
+        }
+        box.addView(inner)
+        return box
+    }
+
     // lekerekitett hatter + kattintaskor "villano" ripple visszajelzes
     private fun rippleBg(content: GradientDrawable, rippleColor: Int): RippleDrawable {
         val mask = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(12).toFloat()
+            cornerRadius = dp(13).toFloat()
             setColor(Color.WHITE)
         }
         return RippleDrawable(ColorStateList.valueOf(rippleColor), content, mask)
     }
 
-    private fun filledButton(label: String, color: Int): Button = Button(this).apply {
-        text = label
-        setTextColor(Color.WHITE)
-        isAllCaps = false
-        val content = GradientDrawable().apply {
-            setColor(color); cornerRadius = dp(12).toFloat()
-        }
-        background = rippleBg(content, Color.parseColor("#66FFFFFF"))
-        setPadding(dp(16), dp(12), dp(16), dp(12))
+    private fun btnBase(label: String): Button = Button(this).apply {
+        text = label; isAllCaps = false; textSize = 14f
+        setTypeface(typeface, Typeface.BOLD)
+        setPadding(dp(16), dp(13), dp(16), dp(13))
     }
 
-    // egy meglevo (filledButton-nal keszult) gomb hatterszinenek atallitasa
-    private fun setButtonColor(btn: Button, color: Int) {
-        val content = GradientDrawable().apply {
-            setColor(color); cornerRadius = dp(12).toFloat()
+    // toltott (akcent) gomb sotet szoveggel - elsodleges muvelet
+    private fun stylePrimary(btn: Button) {
+        btn.setTextColor(cOnAccent)
+        val c = GradientDrawable().apply {
+            setColor(cAccent); cornerRadius = dp(13).toFloat()
         }
-        btn.background = rippleBg(content, Color.parseColor("#66FFFFFF"))
+        btn.background = rippleBg(c, Color.parseColor("#552B2540"))
     }
+
+    // atlatszo, kerettel - masodlagos muvelet
+    private fun styleGhost(btn: Button) {
+        btn.setTextColor(cText)
+        val c = GradientDrawable().apply {
+            setColor(Color.TRANSPARENT); cornerRadius = dp(13).toFloat()
+            setStroke(dp(1), Color.parseColor("#33FFFFFF"))
+        }
+        btn.background = rippleBg(c, Color.parseColor("#22FFFFFF"))
+    }
+
+    // piros keret/szoveg - veszelyes muvelet (leallitas/kikapcsolas)
+    private fun styleDanger(btn: Button) {
+        btn.setTextColor(cRed)
+        val c = GradientDrawable().apply {
+            setColor(Color.TRANSPARENT); cornerRadius = dp(13).toFloat()
+            setStroke(dp(1), Color.parseColor("#5AFCA5A5"))
+        }
+        btn.background = rippleBg(c, Color.parseColor("#22FCA5A5"))
+    }
+
+    private fun primaryButton(label: String): Button = btnBase(label).also { stylePrimary(it) }
+    private fun ghostButton(label: String): Button = btnBase(label).also { styleGhost(it) }
+    private fun dangerButton(label: String): Button = btnBase(label).also { styleDanger(it) }
 
     private fun field(parent: LinearLayout, label: String, value: String, type: Int): EditText {
         parent.addView(TextView(this).apply {
             text = label; textSize = 12f; setTextColor(cTextSub)
-            setPadding(0, dp(12), 0, dp(2))
+            setPadding(0, dp(12), 0, dp(6))
         })
         val et = EditText(this).apply {
-            setText(value); inputType = type; textSize = 15f
+            setText(value); inputType = type; textSize = 14f
+            setTextColor(cText); setHintTextColor(cTextSub)
+            background = GradientDrawable().apply {
+                setColor(cBox); cornerRadius = dp(12).toFloat()
+                setStroke(dp(1), cBorder)
+            }
+            setPadding(dp(13), dp(11), dp(13), dp(11))
         }
         parent.addView(et)
         return et
